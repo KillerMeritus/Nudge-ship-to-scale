@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { TimerProvider } from './contexts/TimerContext';
+import { ActiveTaskProvider } from './contexts/ActiveTaskContext';
+
 import './styles/global.css';
-import Timer from './components/Timer/Timer';
+import CurrentTask from './components/CurrentTask/CurrentTask';
 import TaskList from './components/Tasks/TaskList';
 import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
@@ -10,7 +13,7 @@ import { sendPreset } from './utils/notify';
 import { playSound } from './utils/sound';
 
 const TABS = [
-  { id: 'timer',    label: '⏱ Timer' },
+  { id: 'timer',    label: '🎯 Current Task' },
   { id: 'tasks',    label: '✅ Tasks' },
   { id: 'summary',  label: '📊 Summary' },
   { id: 'settings', label: '⚙️ Settings' },
@@ -20,7 +23,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('timer');
 
   return (
-    <div className={styles.shell}>
+    <TimerProvider>
+      <ActiveTaskProvider>
+        <div className={styles.shell}>
       {/* ── NAV BAR ── */}
       <nav className={styles.nav}>
         <span className={styles.logo}>Nudge</span>
@@ -68,11 +73,13 @@ export default function App() {
 
       {/* ── CONTENT ── */}
       <main className={styles.content}>
-        {activeTab === 'timer'    && <Timer />}
+        {activeTab === 'timer'    && <CurrentTask />}
         {activeTab === 'tasks'    && <TaskList />}
         {activeTab === 'summary'  && <Summary />}
         {activeTab === 'settings' && <Settings />}
       </main>
-    </div>
+        </div>
+      </ActiveTaskProvider>
+    </TimerProvider>
   );
 }
