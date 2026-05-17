@@ -1,63 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useSummary } from '../../contexts/SummaryContext';
 import styles from './Summary.module.css';
-import { sendPreset } from '../../utils/notify';
-import { playSound } from '../../utils/sound';
 
-export default function Summary() {
-  const [isGenerating, setIsGenerating] = useState(false);
+export default function Summary({ setActiveTab }) {
+  const { summaryData, isGenerating, error, generateSummary } = useSummary();
 
-  const [summaryData, setSummaryData] = useState({
-    summary: null,
-    score: null,
-    generated_at: null,
-  });
-
-  // Load latest summary on startup
-  useEffect(() => {
-    fetchLatestSummary();
-  }, []);
-
-  const fetchLatestSummary = async () => {
-    try {
-      const response = await fetch("http://localhost:8080/summary/latest");
-      const data = await response.json();
-
-      setSummaryData(data);
-    } catch (error) {
-      console.error("Failed to fetch latest summary:", error);
-    }
-  };
-
-  // Generate summary
-  const handleGenerate = async () => {
-    setIsGenerating(true);
-
-    try {
-      const response = await fetch(
-        "http://localhost:8080/summary/generate",
-        {
-          method: "POST",
-        }
-      );
-
-      const data = await response.json();
-
-      console.log("Generated summary:", data);
-
-      setSummaryData(data);
-
-      // Notify + sound: summary is ready.
-      await sendPreset('SUMMARY_GENERATED');
-      playSound('summary_generated');
-    } catch (error) {
-      console.error("Summary generation failed:", error);
-
-      alert(
-        "Failed to generate summary. Make sure Gemini API key is added in Settings."
-      );
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleExportMarkdown = () => {
+    if (!summaryData?.summary) return;
+    
+    const blob = new Blob([summaryData.summary], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nudge-summary-${new Date().toISOString().split('T')[0]}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -67,12 +23,42 @@ export default function Summary() {
 
         <button
           className={styles.generateBtn}
-          onClick={handleGenerate}
+          onClick={generateSummary}
           disabled={isGenerating}
         >
           {isGenerating ? "Generating..." : "✨ Generate Now"}
         </button>
       </div>
+
+      {error && (
+        <div className={styles.errorBanner} style={{
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderLeft: '4px solid var(--color-danger)',
+          padding: '1rem',
+          marginBottom: '1rem',
+          borderRadius: '4px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span style={{ color: 'var(--color-danger)' }}>{error}</span>
+          {error.includes("Settings") && (
+            <button 
+              onClick={() => setActiveTab('settings')}
+              style={{
+                backgroundColor: 'var(--color-danger)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Go to Settings
+            </button>
+          )}
+        </div>
+      )}
 
       <div className={styles.summaryCard}>
         <div className={styles.cardHeader}>
@@ -81,7 +67,7 @@ export default function Summary() {
           </div>
 
           <div className={styles.date}>
-            {summaryData.generated_at
+            {summaryData?.generated_at
               ? new Date(summaryData.generated_at).toLocaleDateString(
                   "en-US",
                   {
@@ -92,10 +78,27 @@ export default function Summary() {
                 )
               : "No summary yet"}
           </div>
+          
+          {summaryData?.summary && (
+            <button
+              onClick={handleExportMarkdown}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                color: 'var(--color-text)',
+                border: '1px solid var(--color-border)',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.85rem'
+              }}
+            >
+              📥 Export Markdown
+            </button>
+          )}
         </div>
 
         <div className={styles.content}>
-          {summaryData.summary ? (
+          {summaryData?.summary ? (
             <pre
               style={{
                 whiteSpace: "pre-wrap",
@@ -103,7 +106,7 @@ export default function Summary() {
                 lineHeight: "1.6",
               }}
             >
-              {summaryData.summary}
+              {summaryData?.summary}
             </pre>
           ) : (
             <p>
@@ -117,7 +120,7 @@ export default function Summary() {
         <div className={styles.metrics}>
           <div className={styles.metricBox}>
             <div className={styles.metricValue}>
-              {summaryData.score
+              {summaryData?.score
                 ? `${summaryData.score}/10`
                 : "--"}
             </div>
@@ -129,7 +132,7 @@ export default function Summary() {
 
           <div className={styles.metricBox}>
             <div className={styles.metricValue}>
-              {summaryData.generated_at
+              {summaryData?.generated_at
                 ? "Generated"
                 : "Waiting"}
             </div>

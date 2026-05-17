@@ -57,6 +57,14 @@
 
   /* Transition */
   --transition: 150ms ease;
+
+  /* ── Component aliases (used by Summary, Settings, Tasks) ── */
+  --color-danger:        #ef4444;
+  --color-text:          #f0f0f5;
+  --color-text-muted:    #9898a8;
+  --color-border:        rgba(255, 255, 255, 0.07);
+  --color-bg-secondary:  #16161a;
+  --color-bg-tertiary:   #1e1e24;
 }
 
 /* ---------- RESET ---------- */

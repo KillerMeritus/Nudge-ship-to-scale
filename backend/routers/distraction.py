@@ -101,6 +101,16 @@ async def clear_today_distractions():
     return {"cleared": count}
 
 
+@router.get("/today")
+async def get_today_count():
+    """
+    Returns the number of distractions recorded today.
+    """
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    count = sum(1 for a in _alerts if a.get("timestamp", "").startswith(today_str))
+    return {"count": count}
+
+
 @router.post("/alerts/seen")
 async def mark_alerts_seen():
     """Mark all current alerts as seen. FE-1 calls after displaying them."""

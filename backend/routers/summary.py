@@ -106,7 +106,7 @@ One Suggestion for Tomorrow:
 SCORE: X.X"""
 
 
-# ── AI CLIENTS ────────────────────────────────────────────────────────────────
+# ── SCORE EXTRACTOR ───────────────────────────────────────────────────────────
 
 def _extract_score(text: str) -> tuple[str, float]:
     """Pull SCORE: X.X from the end of the text, strip it, return (clean_text, score)."""
@@ -121,6 +121,8 @@ def _extract_score(text: str) -> tuple[str, float]:
             break
     return text, score
 
+
+# ── AI CLIENTS ────────────────────────────────────────────────────────────────
 
 def _call_gemini(prompt: str, api_key: str) -> tuple[str, float]:
     payload = json.dumps({
@@ -152,7 +154,7 @@ def _call_gemini(prompt: str, api_key: str) -> tuple[str, float]:
     return _extract_score(text)
 
 
-def _call_ollama(prompt: str, model: str) -> tuple[str, float]:
+def _call_ollama(prompt: str, model: str = "gemma") -> tuple[str, float]:
     payload = json.dumps({
         "model": model,
         "prompt": prompt,
@@ -169,8 +171,14 @@ def _call_ollama(prompt: str, model: str) -> tuple[str, float]:
         with urllib.request.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read())
             text = result.get("response", "").strip()
-    except Exception as e:
+    except urllib.error.URLError as e:
         logger.error("Ollama call failed: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "ollama_offline", "message": "Ollama is not running on this machine"}
+        )
+    except Exception as e:
+        logger.error("Ollama unexpected error: %s", e)
         raise HTTPException(
             status_code=503,
             detail={"error": "ollama_offline", "message": "Ollama is not running on this machine"}
@@ -183,7 +191,7 @@ def _call_ollama(prompt: str, model: str) -> tuple[str, float]:
 @router.post("/generate")
 async def generate_summary():
     settings = load_settings()
-    ai_model = settings.get("ai_model", "gemini")
+    ai_model = settings.get("ai_model", "gemini").strip().lower()
 
     # ── Load activity log ──────────────────────────────────────────────────────
     # Prefer snapshot (stable copy) over live log
@@ -224,7 +232,13 @@ async def generate_summary():
     if ai_model == "ollama":
         ollama_model = settings.get("ollama_model", "gemma")
         logger.info("Generating summary via Ollama (%s).", ollama_model)
-        summary_text, score = _call_ollama(prompt, ollama_model)
+        try:
+            summary_text, score = _call_ollama(prompt, ollama_model)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Ollama generation failed: %s", e)
+            raise HTTPException(status_code=503, detail={"error": "ollama_offline", "message": str(e)})
     else:
         # Default: Gemini
         api_key = settings.get("gemini_api_key", "").strip()
@@ -234,7 +248,13 @@ async def generate_summary():
                 detail={"error": "no_api_key", "message": "Add your Gemini API key in Settings"}
             )
         logger.info("Generating summary via Gemini.")
-        summary_text, score = _call_gemini(prompt, api_key)
+        try:
+            summary_text, score = _call_gemini(prompt, api_key)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Gemini generation failed: %s", e)
+            raise HTTPException(status_code=502, detail=f"Failed to generate summary: {str(e)}")
 
     _latest_summary["summary"] = summary_text
     _latest_summary["score"] = score

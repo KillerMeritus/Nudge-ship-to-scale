@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Nudge - Tasks</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Newsreader:opsz,wght@6..72,400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-fixed": "#e4e2da",
+                      "inverse-on-surface": "#f4f0ec",
+                      "tertiary-fixed-dim": "#5edac7",
+                      "surface-container-low": "#f7f3ef",
+                      "on-tertiary-fixed-variant": "#005047",
+                      "on-primary-fixed": "#390b00",
+                      "on-error": "#ffffff",
+                      "tertiary-container": "#09a493",
+                      "surface-variant": "#e6e2de",
+                      "primary-fixed": "#ffdbd0",
+                      "on-surface": "#1c1b19",
+                      "on-primary-container": "#541400",
+                      "on-error-container": "#93000a",
+                      "surface-container-highest": "#e6e2de",
+                      "on-primary-fixed-variant": "#7a2f15",
+                      "outline-variant": "#dbc1b9",
+                      "tertiary-fixed": "#7df7e3",
+                      "primary-fixed-dim": "#ffb59e",
+                      "tertiary": "#006b5f",
+                      "secondary-container": "#e4e2da",
+                      "outline": "#88726c",
+                      "surface-container": "#f2ede9",
+                      "primary-container": "#d97757",
+                      "surface-tint": "#99462a",
+                      "on-tertiary": "#ffffff",
+                      "surface-dim": "#ddd9d6",
+                      "secondary": "#5f5f58",
+                      "background": "#fdf8f5",
+                      "inverse-surface": "#32302e",
+                      "on-background": "#1c1b19",
+                      "on-secondary-fixed": "#1b1c17",
+                      "on-tertiary-container": "#00312b",
+                      "error": "#ba1a1a",
+                      "error-container": "#ffdad6",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-fixed-dim": "#c8c7bf",
+                      "on-secondary": "#ffffff",
+                      "inverse-primary": "#ffb59e",
+                      "surface-bright": "#fdf8f5",
+                      "surface-container-high": "#ece7e4",
+                      "primary": "#99462a",
+                      "surface": "#fdf8f5",
+                      "on-primary": "#ffffff",
+                      "on-surface-variant": "#55433d",
+                      "on-secondary-fixed-variant": "#474741",
+                      "on-secondary-container": "#65655e",
+                      "on-tertiary-fixed": "#00201c"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-md": "24px",
+                      "gutter": "24px",
+                      "unit": "4px",
+                      "stack-sm": "12px",
+                      "stack-lg": "48px",
+                      "margin-mobile": "20px",
+                      "margin-desktop": "40px",
+                      "container-max": "720px"
+              },
+              "fontFamily": {
+                      "label-lg": [
+                              "Inter"
+                      ],
+                      "label-sm": [
+                              "Inter"
+                      ],
+                      "headline-xl": [
+                              "Newsreader"
+                      ],
+                      "body-md": [
+                              "Newsreader"
+                      ],
+                      "body-lg": [
+                              "Newsreader"
+                      ],
+                      "headline-md": [
+                              "Newsreader"
+                      ],
+                      "headline-lg": [
+                              "Newsreader"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Newsreader"
+                      ]
+              },
+              "fontSize": {
+                      "label-lg": [
+                              "15px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-sm": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.03em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-xl": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.1",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-md": [
+                              "17px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-md": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        body {
+            background-color: #fdf8f5; /* surface */
+            color: #1c1b19; /* on-surface */
+            font-family: 'Newsreader', serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .nav-link.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        input[type="checkbox"] {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 1px solid #88726c; /* outline */
+            border-radius: 4px; /* DEFAULT */
+            background-color: #fdf8f5; /* surface */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        input[type="checkbox"]:checked {
+            background-color: #99462a; /* primary */
+            border-color: #99462a;
+        }
+        input[type="checkbox"]:checked::after {
+            content: '\e5ca'; /* Material Symbols 'check' */
+            font-family: 'Material Symbols Outlined';
+            color: #ffffff; /* on-primary */
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface h-screen flex flex-col md:flex-row overflow-hidden">
+<!-- TopAppBar (Mobile) -->
+<header class="md:hidden flex items-center justify-between px-margin-mobile py-stack-sm w-full top-0 bg-surface text-primary border-b border-outline-variant z-40">
+<div class="flex items-center gap-2 cursor-pointer">
+<span class="material-symbols-outlined text-primary" data-icon="bubble_chart" data-weight="fill">bubble_chart</span>
+<span class="font-headline-md text-headline-md text-primary">Nudge</span>
+</div>
+</header>
+<!-- NavigationDrawer (Desktop) -->
+<nav class="hidden md:flex flex-col py-stack-md bg-surface h-full w-64 border-r border-outline-variant flex-shrink-0 z-40">
+<div class="px-margin-desktop mb-stack-lg">
+<span class="font-headline-md text-headline-md text-primary font-bold">Nudge</span>
+</div>
+<div class="flex flex-col w-full">
+<a class="nav-link text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 flex items-center gap-3 px-margin-desktop py-stack-sm w-full" href="#">
+<span class="material-symbols-outlined" data-icon="timer">timer</span>
+<span class="font-label-lg text-label-lg">Timer</span>
+</a>
+<a class="nav-link active text-primary font-bold border-l-2 border-primary bg-surface-container-low transition-all duration-200 flex items-center gap-3 px-margin-desktop py-stack-sm w-full" href="#">
+<span class="material-symbols-outlined" data-icon="checklist" data-weight="fill">checklist</span>
+<span class="font-label-lg text-label-lg">Tasks</span>
+</a>
+<a class="nav-link text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 flex items-center gap-3 px-margin-desktop py-stack-sm w-full" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-label-lg text-label-lg">Summary</span>
+</a>
+<a class="nav-link text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 flex items-center gap-3 px-margin-desktop py-stack-sm w-full" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-lg text-label-lg">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto pb-stack-lg md:pb-0">
+<div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col gap-stack-md">
+<!-- Headers -->
+<header class="flex flex-col gap-unit mb-stack-md">
+<h1 class="font-headline-xl text-headline-xl text-on-surface">Tasks</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Today's Focus</p>
+</header>
+<!-- Add Task Input -->
+<div class="bg-surface-container-low rounded-lg p-unit mb-stack-sm border border-transparent focus-within:border-outline-variant transition-colors flex items-center">
+<span class="material-symbols-outlined text-outline ml-3 mr-2" data-icon="add">add</span>
+<input class="w-full bg-transparent border-none focus:ring-0 font-body-md text-body-md text-on-surface placeholder-outline-variant p-2 outline-none" placeholder="+ Add a new task..." type="text"/>
+</div>
+<!-- Task List -->
+<div class="flex flex-col gap-0 border-t border-outline-variant">
+<!-- Task Row 1 -->
+<div class="group flex items-center gap-4 py-stack-sm border-b border-surface-variant hover:bg-surface-container-low transition-colors px-2 -mx-2 rounded">
+<input class="flex-shrink-0 cursor-pointer" type="checkbox"/>
+<div class="flex-1 min-w-0">
+<h3 class="font-body-md text-body-md text-on-surface truncate">Draft Q3 Strategy Document</h3>
+</div>
+<div class="flex items-center gap-4 flex-shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-variant px-2 py-1 rounded-full">2h 00m</span>
+<div class="flex gap-2 text-on-surface-variant">
+<button class="hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="edit">edit</span></button>
+<button class="hover:text-error transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span></button>
+</div>
+</div>
+</div>
+<!-- Task Row 2 -->
+<div class="group flex items-center gap-4 py-stack-sm border-b border-surface-variant hover:bg-surface-container-low transition-colors px-2 -mx-2 rounded">
+<input checked="" class="flex-shrink-0 cursor-pointer" type="checkbox"/>
+<div class="flex-1 min-w-0">
+<h3 class="font-body-md text-body-md text-on-surface-variant line-through truncate">Review team OKRs</h3>
+</div>
+<div class="flex items-center gap-4 flex-shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-variant px-2 py-1 rounded-full">45m</span>
+<div class="flex gap-2 text-on-surface-variant">
+<button class="hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="edit">edit</span></button>
+<button class="hover:text-error transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span></button>
+</div>
+</div>
+</div>
+<!-- Task Row 3 -->
+<div class="group flex items-center gap-4 py-stack-sm border-b border-surface-variant hover:bg-surface-container-low transition-colors px-2 -mx-2 rounded">
+<input class="flex-shrink-0 cursor-pointer" type="checkbox"/>
+<div class="flex-1 min-w-0">
+<h3 class="font-body-md text-body-md text-on-surface truncate">Prepare slides for all-hands</h3>
+</div>
+<div class="flex items-center gap-4 flex-shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-variant px-2 py-1 rounded-full">1h 30m</span>
+<div class="flex gap-2 text-on-surface-variant">
+<button class="hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="edit">edit</span></button>
+<button class="hover:text-error transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center py-stack-sm bg-surface border-t border-outline-variant z-50">
+<a class="flex flex-col items-center justify-center text-on-surface-variant active:opacity-70 transition-opacity nav-link" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="timer">timer</span>
+<span class="font-label-sm text-label-sm">Timer</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary active:opacity-70 transition-opacity nav-link active" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="checklist" data-weight="fill">checklist</span>
+<span class="font-label-sm text-label-sm">Tasks</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant active:opacity-70 transition-opacity nav-link" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="analytics">analytics</span>
+<span class="font-label-sm text-label-sm">Summary</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant active:opacity-70 transition-opacity nav-link" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="settings">settings</span>
+<span class="font-label-sm text-label-sm">Settings</span>
+</a>
+</nav>
+</body></html>

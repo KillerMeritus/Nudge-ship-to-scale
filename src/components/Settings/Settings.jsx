@@ -3,13 +3,25 @@ import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import styles from './Settings.module.css';
 
 export default function Settings() {
+  const [aiModel, setAiModel] = useState('gemini');
   const [apiKey, setApiKey] = useState('');
   const [workStartTime, setWorkStartTime] = useState('09:00');
   const [workEndTime, setWorkEndTime] = useState('17:00');
   const [launchOnStartup, setLaunchOnStartup] = useState(false);
 
-  // Load actual OS autostart state on mount
+  // Fetch settings on mount
   useEffect(() => {
+    fetch('http://localhost:8080/settings')
+      .then(res => res.json())
+      .then(data => {
+        setAiModel(data.ai_model || 'gemini');
+        setApiKey(data.gemini_api_key || '');
+        setWorkStartTime(data.work_start_time || '09:00');
+        setWorkEndTime(data.work_end_time || '17:00');
+        setLaunchOnStartup(data.launch_on_startup || false);
+      })
+      .catch(console.error);
+      
     if (window.__TAURI_INTERNALS__) {
       isEnabled().then(setLaunchOnStartup).catch(console.error);
     }
@@ -25,6 +37,7 @@ export default function Settings() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        ai_model: aiModel,
         gemini_api_key: apiKey,
         work_start_time: workStartTime,
         work_end_time: workEndTime,
@@ -62,17 +75,40 @@ export default function Settings() {
           <h3 className={styles.sectionTitle}>🤖 AI Configuration</h3>
           
           <div className={styles.formGroup}>
-            <label htmlFor="apiKey" className={styles.label}>Gemini API Key</label>
-            <input 
-              type="password" 
-              id="apiKey"
+            <label className={styles.label}>AI Model</label>
+            <select
               className={styles.input}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="AIzaSy..."
-            />
-            <p className={styles.helpText}>Required for daily productivity summaries. Your key is stored securely on your device.</p>
+              value={aiModel}
+              onChange={(e) => setAiModel(e.target.value)}
+              style={{ padding: '0.75rem', backgroundColor: 'var(--color-bg-secondary)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: '0.5rem', width: '100%' }}
+            >
+              <option value="gemini">Google Gemini (Requires API Key)</option>
+              <option value="ollama">Local Ollama (Requires Ollama running)</option>
+            </select>
           </div>
+
+          {aiModel === 'gemini' && (
+            <div className={styles.formGroup}>
+              <label htmlFor="apiKey" className={styles.label}>Gemini API Key</label>
+              <input 
+                type="password" 
+                id="apiKey"
+                className={styles.input}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="AIzaSy..."
+              />
+              <p className={styles.helpText}>Required for daily productivity summaries. Your key is stored securely on your device.</p>
+            </div>
+          )}
+          
+          {aiModel === 'ollama' && (
+            <div className={styles.formGroup}>
+              <p className={styles.helpText} style={{ color: 'var(--color-text-muted)' }}>
+                Nudge will connect to your local Ollama instance at <code>http://127.0.0.1:11434</code> using the <code>llama3</code> model. No API key needed.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className={styles.section}>

@@ -1,0 +1,158 @@
+# UI Redesign: Quiet Editorial Design System
+
+Migrate the Nudge app's entire frontend from the current dark-mode, CSS Modules design to the "Quiet Editorial" editorial light-mode aesthetic as designed in the Stitch mockups.
+
+## Overview of the New Design
+
+- **Theme**: Warm off-white "paper" background (`#fdf8f5`), Terracotta primary (`#99462a`), charcoal ink text
+- **Typography**: Newsreader (serif) for content/headlines + Inter (sans) for UI chrome/labels
+- **Layout**: Left sidebar navigation on desktop (replaces top tab bar), bottom nav on mobile
+- **Style**: Flat, no shadows. Tonal layering. Quiet and editorial.
+- **Icons**: Google Material Symbols Outlined
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Tailwind CSS**: The Stitch mockups are built with Tailwind CSS v3 + the Quiet Editorial custom theme. This is a significant departure from the current Vanilla CSS + CSS Modules approach. Since this is purely a UI layer change with no backend impact, this is the recommended approach — but confirm before proceeding.
+
+> [!WARNING]
+> **Dark mode is removed**: The new design is light-mode only. The current dark theme (`#0d0d0f` background) will be completely replaced. There is no dark mode toggle in the Stitch designs.
+
+> [!NOTE]
+> **App shell change**: Navigation moves from a **horizontal top tab bar** to a **vertical left sidebar** (desktop) + **bottom bar** (mobile). This requires a structural rewrite of `App.jsx` and `App.module.css`.
+
+---
+
+## Proposed Changes
+
+### Phase 1: Foundation — Design System & App Shell
+
+#### [MODIFY] `src/styles/global.css`
+- Remove all existing dark-mode tokens.
+- Add Google Fonts import: `Newsreader` + `Inter` + `Material Symbols Outlined`.
+- Define the full Quiet Editorial CSS variable set from `DESIGN.md`.
+- Add base body styles: `background: #fdf8f5`, `color: #1c1b19`, `font-family: Newsreader`.
+
+#### [NEW] Install Tailwind CSS v3
+- Add via CDN in `index.html` (same pattern as mockups) OR install as npm dependency and configure `tailwind.config.js`.
+- Recommended: npm install for production builds. CDN for quick iteration.
+- Configure the custom theme tokens (colors, spacing, fontFamily, fontSize, borderRadius) from the Stitch config.
+
+#### [MODIFY] `src/App.jsx` — New App Shell
+- Replace the horizontal `<nav>` tab bar with:
+  - **Desktop**: `<aside>` left sidebar (264px wide, `border-r border-outline-variant`) with vertical nav links + `border-l-2 border-primary` active indicator.
+  - **Mobile**: Fixed `<nav>` bottom bar with icon + label pairs.
+- Logo "Nudge" renders in Newsreader, Terracotta color.
+- Active tab: Terracotta text, bold, left border highlight, `bg-surface-container-low` background.
+- Keep all existing `activeTab`, `distractionCount`, provider wrapping — just change the chrome.
+
+#### [MODIFY] `src/App.module.css`
+- Rewrite to support the new sidebar layout (`flex-row` shell, fixed sidebar, scrollable main).
+- Or remove entirely and use Tailwind utility classes directly in JSX.
+
+---
+
+### Phase 2: Timer Tab — `CurrentTask.jsx`
+
+**Reference**: `timer_dashboard_desktop_web/screen.png` + `code.html`
+
+**New layout** (split two-column on desktop):
+- **Left column**: Circular timer ring — warm off-white circle with `border-outline` 1px border. No gradient/glow. Large `48px` Newsreader numeral in center. Start/Reset buttons below (Terracotta primary + ghost).
+- **Right column**: 
+  - "CURRENT FOCUS" label (Inter 11px, all caps, tracked) + task title in `headline-xl` Newsreader.
+  - Elapsed time with `schedule` material icon.
+  - Thin `16px` horizontal divider.
+  - "COMING UP NEXT" section — list of pending tasks with empty checkbox squares.
+- **No task active**: Show same layout but with "No active task" placeholder copy.
+
+**Files to modify**:
+- `src/components/CurrentTask/CurrentTask.jsx` — full JSX rewrite
+- `src/components/CurrentTask/CurrentTask.module.css` — full CSS rewrite (or migrate to Tailwind)
+
+---
+
+### Phase 3: Tasks Tab — `TaskList.jsx`
+
+**Reference**: `tasks_desktop_web/screen.png` + `code.html`
+
+**New layout**:
+- Page header: "Tasks" (`headline-xl` Newsreader) + "Today's Focus" subtext.
+- Add Task input: `bg-surface-container-low` pill with `add` material icon on left. No border at rest, `outline-variant` border on focus.
+- Task list: borderless rows separated by 1px `border-surface-variant` dividers. Generous `24px` vertical padding.
+  - Custom checkbox: 20×20px, `border-outline`, Terracotta fill with white checkmark when checked.
+  - Task title: `body-md` Newsreader.
+  - Est. time chip: `surface-variant` background, pill-shaped, `label-sm` Inter.
+  - Edit/delete icons: appear on hover (`opacity-0 group-hover:opacity-100`).
+  - Completed tasks: `line-through`, `text-on-surface-variant`.
+- Active task at top with left terracotta indicator strip.
+
+**Files to modify**:
+- `src/components/Tasks/TaskList.jsx` — JSX rewrite
+- `src/components/Tasks/TaskList.module.css` — CSS rewrite / migrate to Tailwind
+
+---
+
+### Phase 4: Summary Tab — `Summary.jsx`
+
+**Reference**: `summary_desktop_web/screen.png` + `code.html`
+
+**New layout** (editorial document style, max-width 720px centered):
+- Page header: "Daily Summary" (`headline-xl`) + date (`body-md`, muted).
+- **AI Insight card**: `bg-surface-container-low`, 1px `outline-variant` border, rounded-lg. `auto_awesome` icon + "AI Insight" label in Terracotta. Body text in Newsreader.
+- **Deep Work Time**: Large `headline-xl` metric.
+- **Top Distractions**: Header + list rows with time chips (same pill style as tasks).
+- **What You Worked On**: Article cards with project name, time chip, and descriptive Newsreader body paragraph.
+- **Actions section**: "Generate Now" Terracotta button + "Export to Markdown" ghost link (underlined on hover).
+- Error banner: keep inline error banner logic from current implementation.
+
+**Files to modify**:
+- `src/components/Summary/Summary.jsx` — JSX rewrite
+- `src/components/Summary/Summary.module.css` — CSS rewrite
+
+---
+
+### Phase 5: Settings Tab — `Settings.jsx`
+
+**Reference**: `settings_desktop_web/screen.png` + `code.html`
+
+**New layout** (document-style, max-width 720px):
+- Page header: "Settings" (`headline-xl`) + subtitle text.
+- **AI Configuration section**: `headline-lg` section title + body description. AI model selector + Gemini key input (`bg-surface-container-low`, `border-outline-variant`, Terracotta focus ring).
+- **System section**: Launch on startup toggle — custom Tailwind peer-checked toggle (Terracotta fill when on).
+- **Work Hours section**: 2-column time inputs grid.
+- `<hr>` dividers (`border-outline-variant/50`) between sections.
+- "Save Preferences" button: Terracotta, right-aligned, `rounded-DEFAULT`.
+
+**Files to modify**:
+- `src/components/Settings/Settings.jsx` — JSX rewrite
+- `src/components/Settings/Settings.module.css` — CSS rewrite
+
+---
+
+### Phase 6: Cleanup
+
+- Remove old dark-mode-specific CSS variables from `global.css`.
+- Remove unused `--color-danger`, `--bg-base`, etc. aliases (replace with Tailwind).
+- Verify `SummaryContext`, `TimerContext`, `ActiveTaskContext` are untouched (logic only, no UI).
+- Verify all backend API calls remain unchanged.
+
+---
+
+## Verification Plan
+
+### Manual Verification (in running `npm run tauri dev`)
+1. App shell: sidebar renders at desktop, bottom bar on mobile (resize window to test).
+2. Timer tab: circular ring shows, active task shows right-column content, no task shows placeholder.
+3. Tasks tab: add task input works, checkbox checks/unchecks correctly, hover reveals edit/delete.
+4. Summary tab: "Generate Now" fires API, AI insight card renders with Newsreader body text, export downloads `.md`.
+5. Settings tab: toggles, inputs, and save button all wire up to backend correctly.
+6. Navigation: switching tabs via sidebar + bottom bar both work, active state highlights correctly.
+
+### Key Design Rules to Verify
+- No dark backgrounds anywhere.
+- Terracotta (`#99462a`) used only for: active nav, primary buttons, focus rings.
+- Newsreader for all headlines and body content.
+- Inter for all labels, buttons, chips.
+- No box shadows except where explicitly permitted (modal/floating elements only).
