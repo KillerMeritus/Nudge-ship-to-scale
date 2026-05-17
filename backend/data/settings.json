@@ -1,0 +1,17 @@
+{
+  "gemini_api_key": "AIzaSyDUwu4S8bDhDcEfMMVUu16dWXCFWMJkczU",
+  "work_duration_minutes": 25,
+  "short_break_minutes": 5,
+  "long_break_minutes": 15,
+  "long_break_after_cycles": 4,
+  "long_break_enabled": true,
+  "launch_on_startup": true,
+  "distraction_detection_enabled": true,
+  "idle_threshold_seconds": 120,
+  "distraction_whitelist": [],
+  "ai_model": "ollama",
+  "ollama_model": "llama3",
+  "distraction_cooldown_seconds": 180,
+  "work_start_time": "09:00",
+  "work_end_time": "17:00"
+}

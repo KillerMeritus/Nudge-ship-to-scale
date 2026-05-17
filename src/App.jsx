@@ -8,16 +8,14 @@ import CurrentTask from './components/CurrentTask/CurrentTask';
 import TaskList from './components/Tasks/TaskList';
 import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
-import styles from './App.module.css';
-// [DEV] Notification + sound utilities — remove demo button before shipping v1
 import { sendPreset } from './utils/notify';
 import { playSound } from './utils/sound';
 
 const TABS = [
-  { id: 'timer',    label: '🎯 Current Task' },
-  { id: 'tasks',    label: '✅ Tasks' },
-  { id: 'summary',  label: '📊 Summary' },
-  { id: 'settings', label: '⚙️ Settings' },
+  { id: 'timer',    icon: 'timer',       label: 'Timer' },
+  { id: 'tasks',    icon: 'task_alt',    label: 'Tasks' },
+  { id: 'summary',  icon: 'auto_awesome',label: 'Summary' },
+  { id: 'settings', icon: 'settings',    label: 'Settings' },
 ];
 
 export default function App() {
@@ -49,31 +47,34 @@ export default function App() {
     <TimerProvider>
       <ActiveTaskProvider>
         <SummaryProvider>
-          <div className={styles.shell}>
-            {/* ── NAV BAR ── */}
-            <nav className={styles.nav}>
-              <span className={styles.logo}>Nudge</span>
-              <div className={styles.tabs} role="tablist">
+          {/* Main App Shell Layout */}
+          <div className="flex h-screen w-full bg-background font-inter text-on-background selection:bg-primary selection:text-on-primary">
+            
+            {/* SIDEBAR */}
+            <nav className="w-56 shrink-0 bg-surface-container-low border-r border-outline-variant flex flex-col pt-8 pb-4">
+              <div className="px-6 mb-8 flex items-center justify-between">
+                <span className="font-newsreader text-headline-md italic text-primary">Nudge</span>
+              </div>
+              
+              <div className="flex-1 flex flex-col gap-1 px-3">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
-                    id={`tab-${tab.id}`}
-                    role="tab"
-                    aria-selected={activeTab === tab.id}
-                    className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
                     onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-label-lg transition-colors ${
+                      activeTab === tab.id 
+                        ? 'bg-primary text-on-primary font-medium' 
+                        : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                    }`}
                   >
+                    <span className="material-symbols-outlined text-[20px]">{tab.icon}</span>
                     {tab.label}
                     {tab.id === 'summary' && distractionCount > 0 && (
-                      <span style={{
-                        backgroundColor: 'var(--color-danger)',
-                        color: 'white',
-                        borderRadius: '12px',
-                        padding: '2px 6px',
-                        fontSize: '11px',
-                        marginLeft: '6px',
-                        fontWeight: 'bold',
-                      }}>
+                      <span className={`ml-auto text-label-sm px-2 py-0.5 rounded-full font-bold ${
+                        activeTab === tab.id
+                          ? 'bg-on-primary text-primary'
+                          : 'bg-error text-on-error'
+                      }`}>
                         {distractionCount}
                       </span>
                     )}
@@ -81,35 +82,26 @@ export default function App() {
                 ))}
               </div>
 
-              {/* [DEV] Temporary — test all three notification presets. Remove before v1 release. */}
-              <button
-                id="dev-test-notifications"
-                title="Dev: test notifications"
-                style={{
-                  marginLeft: 'auto',
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  opacity: 0.5,
-                  cursor: 'pointer',
-                  borderRadius: '6px',
-                  border: '1px solid currentColor',
-                  background: 'transparent',
-                  color: 'inherit',
-                }}
-                onClick={async () => {
-                  // Fire notification + sound for each preset with staggered timing.
-                  await sendPreset('DEEP_WORK_STARTED');
-                  playSound('deep_work_start');
-                  setTimeout(() => { sendPreset('POMODORO_COMPLETE'); playSound('pomodoro_complete'); }, 1500);
-                  setTimeout(() => { sendPreset('SUMMARY_GENERATED'); playSound('summary_generated'); }, 3000);
-                }}
-              >
-                🔔 Test
-              </button>
+              {/* Dev Notifier Test */}
+              <div className="px-6 mt-auto">
+                <button
+                  className="w-full py-1.5 px-3 border border-outline-variant rounded-md text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors flex items-center justify-center gap-2 opacity-50"
+                  onClick={async () => {
+                    await sendPreset('DEEP_WORK_STARTED');
+                    playSound('deep_work_start');
+                    setTimeout(() => { sendPreset('POMODORO_COMPLETE'); playSound('pomodoro_complete'); }, 1500);
+                    setTimeout(() => { sendPreset('SUMMARY_GENERATED'); playSound('summary_generated'); }, 3000);
+                  }}
+                  title="Test notifications"
+                >
+                  <span className="material-symbols-outlined text-[16px]">notifications</span>
+                  Test Alerts
+                </button>
+              </div>
             </nav>
 
-            {/* ── CONTENT ── */}
-            <main className={styles.content}>
+            {/* CONTENT AREA */}
+            <main className="flex-1 overflow-y-auto bg-background">
               {activeTab === 'timer'    && <CurrentTask />}
               {activeTab === 'tasks'    && <TaskList />}
               {activeTab === 'summary'  && <Summary setActiveTab={setActiveTab} />}

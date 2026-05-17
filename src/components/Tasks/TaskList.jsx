@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useActiveTask } from '../../contexts/ActiveTaskContext';
-import styles from './Tasks.module.css';
 
 const formatEstimate = (h, m) => {
   const hours = parseInt(h) || 0;
   const mins = parseInt(m) || 0;
   if (hours === 0 && mins === 0) return null;
-  if (hours === 0) return `Est: ${mins}m`;
-  return `Est: ${hours}h ${mins.toString().padStart(2, '0')}m`;
+  if (hours === 0) return `${mins}m`;
+  return `${hours}h ${mins.toString().padStart(2, '0')}m`;
 };
 
 const fmt = (seconds) => {
@@ -166,18 +165,6 @@ export default function TaskList() {
       });
       const updatedTask = await response.json();
       setTasks(tasks.map(t => t.id === id ? updatedTask : t));
-      
-      // Update activeTask title if it's currently running
-      if (activeTask && activeTask.id === id) {
-        // Just calling startTask again might reset the timer depending on how ActiveTaskContext is implemented
-        // Since ActiveTaskContext state is independent from the TaskList, to update the title live,
-        // we might just need to rely on the backend. But since ActiveTaskContext stores the full task object,
-        // we'd theoretically need a way to update it. We can ignore this strictly if it's too complex,
-        // but the easiest is just letting the user re-start it or it updates automatically.
-        // Wait, self-test says: "Edit running task title → title updates in Current Task tab immediately"
-        // Let's fix that next if it doesn't work out of the box.
-      }
-
       setEditingTaskId(null);
     } catch (error) {
       console.error("Failed to update task:", error);
@@ -185,61 +172,59 @@ export default function TaskList() {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Tasks</h2>
-      </div>
+    <div className="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col gap-stack-md">
+      
+      {/* Headers */}
+      <header className="flex flex-col gap-unit mb-stack-md">
+        <h1 className="font-headline-xl text-headline-xl text-on-surface">Tasks</h1>
+        <p className="font-body-lg text-body-lg text-on-surface-variant">Today's Focus</p>
+      </header>
 
-      <form className={styles.taskInputWrapper} onSubmit={addTask} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-        <input
-          type="text"
-          className={styles.taskInput}
-          placeholder="What needs to be done?"
+      {/* Add Task Input */}
+      <form 
+        onSubmit={addTask}
+        className="bg-surface-container-low rounded-lg p-unit mb-stack-sm border border-transparent focus-within:border-outline-variant transition-colors flex flex-col sm:flex-row items-center gap-2 px-3 py-2"
+      >
+        <span className="material-symbols-outlined text-outline">add</span>
+        <input 
+          type="text" 
+          placeholder="What needs to be done?" 
           value={newTaskTitle}
           onChange={(e) => setNewTaskTitle(e.target.value)}
+          className="w-full bg-transparent border-none focus:ring-0 font-body-md text-body-md text-on-surface placeholder-outline-variant p-2 outline-none"
         />
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
-          <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Est. Time:</span>
-          <input
+        <div className="flex items-center gap-2 shrink-0">
+          <input 
             type="number"
-            placeholder="h"
             min="0" max="23"
-            className={styles.taskInput}
-            style={{ width: '60px', flex: 'none' }}
+            placeholder="h"
             value={newHours}
             onChange={(e) => setNewHours(e.target.value)}
+            className="w-14 bg-surface rounded px-2 py-1 border border-outline-variant focus:border-primary text-body-md"
           />
-          <input
+          <span className="text-on-surface-variant font-body-md">:</span>
+          <input 
             type="number"
-            placeholder="m"
             min="0" max="59"
-            className={styles.taskInput}
-            style={{ width: '60px', flex: 'none' }}
+            placeholder="m"
             value={newMinutes}
             onChange={(e) => setNewMinutes(e.target.value)}
+            className="w-14 bg-surface rounded px-2 py-1 border border-outline-variant focus:border-primary text-body-md"
           />
-          <div style={{ flex: 1 }}></div>
-          <button
-            type="submit"
-            className={styles.addBtn}
+          <button 
+            type="submit" 
             disabled={!newTaskTitle.trim()}
+            className="ml-2 px-4 py-1.5 bg-primary text-on-primary font-label-md rounded hover:bg-surface-tint disabled:opacity-50 transition-colors"
           >
             Add
           </button>
         </div>
       </form>
 
-      <div className={styles.taskList}>
+      {/* Task List */}
+      <div className="flex flex-col gap-0 border-t border-outline-variant">
         {tasks.length === 0 ? (
-          <p
-            style={{
-              color: 'var(--text-muted)',
-              textAlign: 'center',
-              marginTop: 'var(--space-8)',
-            }}
-          >
-            No tasks yet. Enjoy your day! 🎉
-          </p>
+          <p className="text-on-surface-variant text-center mt-stack-md italic">No tasks yet. Enjoy your day! 🎉</p>
         ) : (
           [...tasks].sort((a, b) => {
             if (activeTask && a.id === activeTask.id) return -1;
@@ -267,90 +252,98 @@ export default function TaskList() {
 
             if (isEditing) {
               return (
-                <div key={task.id} className={styles.taskItem} style={{ flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                    <input type="text" className={styles.taskInput} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} autoFocus />
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }}>
-                    <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Est:</span>
-                    <input type="number" min="0" max="23" placeholder="h" className={styles.taskInput} style={{width:'60px', flex:'none', padding: '4px 8px'}} value={editHours} onChange={(e) => setEditHours(e.target.value)} />
-                    <input type="number" min="0" max="59" placeholder="m" className={styles.taskInput} style={{width:'60px', flex:'none', padding: '4px 8px'}} value={editMinutes} onChange={(e) => setEditMinutes(e.target.value)} />
-                    <div style={{ flex: 1 }}></div>
-                    <button onClick={() => saveEdit(task.id)} className={styles.addBtn} style={{ padding: '4px 12px' }}>Save</button>
-                    <button onClick={cancelEdit} className={styles.addBtn} style={{ padding: '4px 12px', background: 'var(--text-muted)' }}>Cancel</button>
+                <div key={task.id} className="flex flex-col gap-3 py-stack-sm border-b border-surface-variant px-2 -mx-2 rounded bg-surface-container-low">
+                  <input 
+                    type="text" 
+                    className="w-full bg-surface border border-outline-variant rounded p-2 focus:border-primary font-body-md"
+                    value={editTitle} 
+                    onChange={(e) => setEditTitle(e.target.value)} 
+                    autoFocus 
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-on-surface-variant font-label-sm">Est:</span>
+                    <input 
+                      type="number" min="0" max="23" placeholder="h" 
+                      className="w-14 bg-surface rounded px-2 py-1 border border-outline-variant"
+                      value={editHours} onChange={(e) => setEditHours(e.target.value)} 
+                    />
+                    <input 
+                      type="number" min="0" max="59" placeholder="m" 
+                      className="w-14 bg-surface rounded px-2 py-1 border border-outline-variant"
+                      value={editMinutes} onChange={(e) => setEditMinutes(e.target.value)} 
+                    />
+                    <div className="flex-1"></div>
+                    <button onClick={() => saveEdit(task.id)} className="px-3 py-1 bg-primary text-on-primary font-label-md rounded">Save</button>
+                    <button onClick={cancelEdit} className="px-3 py-1 bg-surface-variant text-on-surface font-label-md rounded">Cancel</button>
                   </div>
                 </div>
               );
             }
 
             return (
-              <div
-                key={task.id}
-                className={`${styles.taskItem} ${isDone ? styles.taskItemCompleted : ''}`}
-                style={isRunningTask ? { borderLeft: '4px solid var(--accent)', backgroundColor: 'var(--bg-overlay)' } : {}}
+              <div 
+                key={task.id} 
+                className={`group flex items-center gap-4 py-stack-sm border-b border-surface-variant hover:bg-surface-container-low transition-colors px-2 -mx-2 rounded ${isRunningTask ? 'border-l-4 border-l-primary bg-surface-container-low/50' : ''}`}
               >
-                <input
-                  type="checkbox"
-                  className={styles.checkbox}
+                <input 
+                  type="checkbox" 
+                  className="flex-shrink-0 cursor-pointer form-checkbox h-5 w-5 rounded border-outline text-primary focus:ring-primary bg-surface transition duration-150 ease-in-out" 
                   checked={isDone}
                   onChange={() => toggleTask(task.id)}
                 />
-
-                <div className={styles.taskContent}>
-                  <div className={styles.taskTitle}>
+                
+                <div className="flex-1 min-w-0">
+                  <h3 className={`font-body-md text-body-md truncate ${isDone ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>
                     {task.title}
-                  </div>
+                  </h3>
                   
-                  {(estStr || isRunningTask) && (
-                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      {estStr} {isRunningTask && <span style={{ color: 'var(--accent)', fontWeight: 600, marginLeft: estStr ? '8px' : '0' }}>({displayTime})</span>}
-                    </div>
-                  )}
-
-                  {isDone && task.is_recurring && (
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Will reset tomorrow</div>
-                  )}
-
-                  {task.tags && task.tags.length > 0 && (
-                    <div className={styles.taskTags}>
-                      {task.tags.map(tag => (
-                        <span key={tag} className={styles.tag}>
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
+                  {/* Progress Display for Running Tasks */}
+                  {isRunningTask && (
+                     <div className="font-label-sm text-label-sm text-primary mt-1">
+                       Active: {displayTime} {estStr && ` / ${estStr}`}
+                     </div>
                   )}
                 </div>
 
-                {isDeleting ? (
-                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                     <span style={{ fontSize: '12px', color: 'var(--priority-high)' }}>Delete this task?</span>
-                     <button className={styles.addBtn} style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => deleteTask(task.id)}>Confirm</button>
-                     <button className={styles.addBtn} style={{ padding: '4px 10px', fontSize: '12px', background: 'var(--text-muted)' }} onClick={cancelDelete}>Cancel</button>
-                   </div>
-                ) : (
-                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                     {!isDone && (
-                       <>
-                         {isRunning ? (
-                           <button onClick={() => pauseTask()} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--accent)', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: 600 }}>Pause</button>
-                         ) : isPaused ? (
-                           <button onClick={() => resumeTask()} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--accent)', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: 600 }}>Resume</button>
-                         ) : (
-                           <button onClick={() => startTask(task)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--accent)', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: 600 }}>Start</button>
-                         )}
-                       </>
-                     )}
-                     <button onClick={() => startEdit(task)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', fontSize: '12px' }} title="Edit">
-                       ✎
-                     </button>
-                     <button onClick={() => confirmDelete(task.id)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', fontSize: '12px' }} title="Delete task">
-                       ✕
-                     </button>
-                   </div>
-                )}
+                <div className={`flex items-center gap-4 flex-shrink-0 transition-opacity ${!isRunningTask && !isDeleting ? 'opacity-100 md:opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
+                  {/* Estimate Pill */}
+                  {!isRunningTask && estStr && (
+                    <span className="font-label-sm text-label-sm text-on-surface-variant bg-surface-variant px-2 py-1 rounded-full">
+                      {estStr}
+                    </span>
+                  )}
+
+                  {/* Actions */}
+                  {isDeleting ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-error font-label-sm">Delete?</span>
+                      <button onClick={() => deleteTask(task.id)} className="text-error hover:underline font-label-sm">Yes</button>
+                      <button onClick={cancelDelete} className="text-on-surface-variant hover:underline font-label-sm">No</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 text-on-surface-variant">
+                      {!isDone && (
+                         <>
+                           {isRunning ? (
+                             <button onClick={() => pauseTask()} className="hover:text-primary transition-colors text-label-sm font-bold border border-primary px-2 rounded">Pause</button>
+                           ) : isPaused ? (
+                             <button onClick={() => resumeTask()} className="hover:text-primary transition-colors text-label-sm font-bold border border-primary px-2 rounded">Resume</button>
+                           ) : (
+                             <button onClick={() => startTask(task)} className="hover:text-primary transition-colors text-label-sm font-bold border border-outline-variant hover:border-primary px-2 rounded">Start</button>
+                           )}
+                         </>
+                      )}
+                      <button onClick={() => startEdit(task)} className="hover:text-primary transition-colors" title="Edit">
+                        <span className="material-symbols-outlined text-[20px]">edit</span>
+                      </button>
+                      <button onClick={() => confirmDelete(task.id)} className="hover:text-error transition-colors" title="Delete">
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            )
+            );
           })
         )}
       </div>

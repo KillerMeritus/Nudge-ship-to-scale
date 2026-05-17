@@ -15,7 +15,7 @@ from scraper.ai.prompts import SYSTEM_PROMPT, build_prompt
 _SETTINGS_FILE = Path(__file__).parent.parent.parent / "backend" / "data" / "settings.json"
 
 _OLLAMA_URL = "http://localhost:11434/api/generate"
-_TIMEOUT    = 8.0   # seconds
+_TIMEOUT    = 30.0   # seconds
 
 _warned_offline = False
 

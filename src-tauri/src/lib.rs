@@ -162,7 +162,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![update_tray_timer])
         // Make TrayState available via tauri::State<>
         .manage(tray_state)
-        .setup(|app| {
+        .setup(move |app| {
             let app_handle = app.handle().clone();
 
             // ── Step 3: Health-check thread ──────────────────────────────────
@@ -273,12 +273,13 @@ pub fn run() {
             // hides the window instead of terminating the process. The app
             // continues to run in the tray until the user chooses "Quit Nudge".
             if let Some(window) = app.get_webview_window("main") {
+                let app_handle_close = app_handle.clone();
                 window.on_window_event(move |event| {
                     if let WindowEvent::CloseRequested { api, .. } = event {
                         // Prevent the default close/quit behaviour.
                         api.prevent_close();
                         // Hide the window — app lives on in tray.
-                        if let Some(w) = app_handle.get_webview_window("main") {
+                        if let Some(w) = app_handle_close.get_webview_window("main") {
                             let _ = w.hide();
                             println!("[Nudge] Window hidden — app running in tray.");
                         }

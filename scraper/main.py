@@ -147,7 +147,10 @@ def _flush_log():
 # ── MAIN LOOP ─────────────────────────────────────────────────────────────────
 POLL_INTERVAL = 5  # seconds
 
+from scraper.distraction_loop import start_distraction_loop
+
 def main():
+    start_distraction_loop()
     print(f"[scraper] Starting on {PLATFORM}. Polling every {POLL_INTERVAL}s.")
     while True:
         try:

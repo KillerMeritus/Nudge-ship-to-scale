@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react';
-import styles from './CurrentTask.module.css';
+import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useTimer } from '../../contexts/TimerContext';
@@ -38,8 +37,17 @@ export default function CurrentTask() {
     elapsedSeconds,
     taskStatus,
     pauseTask,
-    resumeTask
+    resumeTask,
   } = useActiveTask();
+
+  const [tasks, setTasks] = useState([]);
+
+  useEffect(() => {
+    fetch('http://localhost:8080/tasks')
+      .then(res => res.json())
+      .then(data => setTasks(data))
+      .catch(console.error);
+  }, []);
 
   const isActive = status === 'running';
   
@@ -120,141 +128,171 @@ export default function CurrentTask() {
     }
   };
 
-  // Calculate SVG stroke-dashoffset
-  const radius = 120;
-  const circumference = 2 * Math.PI * radius;
-  
+  const toggleTaskTimer = () => {
+    if (taskStatus === 'running') {
+      pauseTask();
+    } else {
+      resumeTask();
+    }
+  };
+
+  // Determine what to display
   let currentDuration = MODES.focus.duration;
   if (sessionType === 'short_break') currentDuration = MODES.shortBreak.duration;
   if (sessionType === 'long_break') currentDuration = MODES.longBreak.duration;
 
-  const progress = remainingSeconds / currentDuration;
-  const dashOffset = circumference - progress * circumference;
+  const displayTime = activeTask 
+    ? fmt(elapsedSeconds)
+    : fmt(remainingSeconds);
 
-  // Task time calculations
-  let taskDisplayTime = fmt(elapsedSeconds);
-  let taskDashOffset = circumference;
-  
-  if (activeTask) {
-    const taskTotalSeconds = (activeTask.estimated_hours || 0) * 3600 + (activeTask.estimated_minutes || 0) * 60;
-    if (taskTotalSeconds > 0) {
-      const remaining = taskTotalSeconds - elapsedSeconds;
-      if (remaining < 0) {
-        taskDisplayTime = `-${fmt(Math.abs(remaining))}`;
-      } else {
-        taskDisplayTime = fmt(remaining);
-      }
-      
-      const taskProgress = Math.min(elapsedSeconds / taskTotalSeconds, 1);
-      taskDashOffset = circumference - taskProgress * circumference;
-    }
-  }
+  // Next tasks logic
+  const upcomingTasks = tasks
+    .filter(t => t.status === 'todo' && (!activeTask || t.id !== activeTask.id))
+    .slice(0, 3); // Get top 3 upcoming
 
   return (
-    <div className={styles.container}>
-      {activeTask ? (
-        <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>
-            {activeTask.title}
-          </h2>
-          
-          <div className={styles.timerRing}>
-            <svg width="280" height="280" viewBox="0 0 280 280">
-              <circle 
-                className={styles.ringBackground} 
-                cx="140" cy="140" r="120" 
-              />
-              <circle 
-                className={styles.ringProgress} 
-                cx="140" cy="140" r="120"
-                strokeDasharray={circumference}
-                strokeDashoffset={taskDashOffset}
-                transform="rotate(-90 140 140)"
-                style={{ stroke: 'var(--accent)' }}
-              />
-            </svg>
-            <div className={styles.timeDisplay}>
-              {taskDisplayTime}
-            </div>
-          </div>
+    <div className="flex flex-col items-center justify-center relative h-full overflow-y-auto w-full p-8">
+      
+      {/* Background Focus Pattern (Optional/Subtle) */}
+      <div className="absolute inset-0 z-0 opacity-[0.02] pointer-events-none flex items-center justify-center">
+        {/* Can put an SVG pattern here in the future if desired */}
+      </div>
 
-          <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '24px', marginBottom: '16px' }}>
-            {taskStatus === 'paused' ? 'Paused' : 'Running'}
-          </div>
-          {taskStatus === 'paused' ? (
-            <button onClick={resumeTask} className={styles.modeBtn} style={{ background: 'var(--bg-overlay)' }}>Resume Task</button>
-          ) : (
-            <button onClick={pauseTask} className={styles.modeBtn} style={{ background: 'var(--bg-overlay)' }}>Pause Task</button>
-          )}
+      {/* Mode Selector (Only shown if no active task is running, to keep it simple) */}
+      {!activeTask && (
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-container-low rounded-full p-1 z-20 shadow-sm border border-outline-variant">
+           <button 
+             onClick={() => changeMode('focus')}
+             className={`px-4 py-1.5 rounded-full text-label-md transition-colors ${
+               sessionType === 'focus' ? 'bg-primary text-on-primary font-bold shadow' : 'text-on-surface-variant hover:text-on-surface'
+             }`}
+           >
+             Focus
+           </button>
+           <button 
+             onClick={() => changeMode('short_break')}
+             className={`px-4 py-1.5 rounded-full text-label-md transition-colors ${
+               sessionType === 'short_break' ? 'bg-primary text-on-primary font-bold shadow' : 'text-on-surface-variant hover:text-on-surface'
+             }`}
+           >
+             Short Break
+           </button>
+           <button 
+             onClick={() => changeMode('long_break')}
+             className={`px-4 py-1.5 rounded-full text-label-md transition-colors ${
+               sessionType === 'long_break' ? 'bg-primary text-on-primary font-bold shadow' : 'text-on-surface-variant hover:text-on-surface'
+             }`}
+           >
+             Long Break
+           </button>
         </div>
-      ) : (
-        <>
-          <header>
-            <div className={styles.modeSelector}>
-              <button 
-                className={`${styles.modeBtn} ${sessionType === 'focus' ? styles.modeBtnActive : ''}`}
-                onClick={() => changeMode('focus')}
-              >
-                Focus
-              </button>
-              <button 
-                className={`${styles.modeBtn} ${sessionType === 'short_break' ? styles.modeBtnActive : ''}`}
-                onClick={() => changeMode('short_break')}
-              >
-                Short Break
-              </button>
-              <button 
-                className={`${styles.modeBtn} ${sessionType === 'long_break' ? styles.modeBtnActive : ''}`}
-                onClick={() => changeMode('long_break')}
-              >
-                Long Break
-              </button>
-            </div>
-          </header>
-
-          <div className={styles.timerRing}>
-            <svg width="280" height="280" viewBox="0 0 280 280">
-              <circle 
-                className={styles.ringBackground} 
-                cx="140" cy="140" r="120" 
-              />
-              <circle 
-                className={styles.ringProgress} 
-                cx="140" cy="140" r="120"
-                strokeDasharray={circumference}
-                strokeDashoffset={dashOffset}
-                transform="rotate(-90 140 140)"
-              />
-            </svg>
-            <div className={styles.timeDisplay}>
-              {fmt(remainingSeconds)}
-            </div>
-          </div>
-
-          <div className={styles.controls}>
-            <button 
-              className={styles.playBtn}
-              onClick={toggleTimer}
-            >
-              {isActive ? 'Pause' : 'Start'}
-            </button>
-            
-            <button className={styles.iconBtn} onClick={reset} title="Reset">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-              </svg>
-            </button>
-            
-            <button className={styles.iconBtn} onClick={skipTimer} title="Skip">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="5 4 15 12 5 20 5 4" />
-                <line x1="19" y1="5" x2="19" y2="19" />
-              </svg>
-            </button>
-          </div>
-        </>
       )}
+
+      <div className="w-full max-w-5xl mx-auto px-margin-desktop flex flex-col md:flex-row items-center justify-center min-h-full gap-12 lg:gap-24 relative z-10">
+        
+        {/* Left: Timer Section */}
+        <div className="flex flex-col items-center">
+          
+          {/* Timer Display */}
+          <div className="relative flex items-center justify-center w-64 h-64 md:w-80 md:h-80 rounded-full border border-outline bg-surface-container-lowest/70 backdrop-blur-md shadow-sm mb-stack-lg transition-colors">
+            
+            {/* Inner subtle ring for depth */}
+            <div className="absolute inset-2 rounded-full border border-surface-variant opacity-50"></div>
+            
+            <span className={`font-headline-xl text-headline-xl md:scale-125 tracking-tight transition-colors ${
+                (activeTask && taskStatus === 'running') || (!activeTask && isActive) ? 'text-primary' : 'text-on-surface'
+              }`} 
+              style={{ fontFeatureSettings: "'tnum' 1" }}>
+              {displayTime}
+            </span>
+            
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-4">
+            {activeTask ? (
+              <button 
+                onClick={toggleTaskTimer}
+                className="px-8 py-3 bg-primary text-on-primary font-label-lg rounded-lg hover:bg-surface-tint transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
+              >
+                {taskStatus === 'running' ? 'Pause Task' : 'Resume Task'}
+              </button>
+            ) : (
+              <>
+                <button 
+                  onClick={toggleTimer}
+                  className="px-8 py-3 bg-primary text-on-primary font-label-lg rounded-lg hover:bg-surface-tint transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface w-32 text-center"
+                >
+                  {isActive ? 'Pause' : 'Start'}
+                </button>
+                <button 
+                  onClick={reset}
+                  className="px-8 py-3 bg-transparent text-on-surface font-label-lg rounded-lg hover:bg-surface-container transition-all focus:outline-none border border-transparent hover:border-outline-variant"
+                >
+                  Reset
+                </button>
+                <button 
+                  onClick={skipTimer}
+                  className="px-8 py-3 bg-transparent text-on-surface font-label-lg rounded-lg hover:bg-surface-container transition-all focus:outline-none border border-transparent hover:border-outline-variant"
+                >
+                  Skip
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Focus Dashboard Section */}
+        <div className="flex flex-col max-w-md w-full gap-8">
+          
+          {/* Current Focus */}
+          <div>
+            <h2 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-3">
+              {activeTask ? 'Current Focus' : 'Pomodoro Status'}
+            </h2>
+            <h1 className={`font-headline-lg text-headline-lg mb-4 leading-tight ${activeTask ? 'text-on-surface' : 'text-on-surface-variant italic'}`}>
+              {activeTask ? activeTask.title : 'No specific task selected. Just focusing.'}
+            </h1>
+            
+            {activeTask && (
+              <div className="flex items-center gap-2 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[18px]">schedule</span>
+                <span className="font-label-md text-label-md">
+                  {Math.floor(elapsedSeconds / 60)} mins elapsed
+                </span>
+                {activeTask.estimated_minutes && (
+                  <>
+                    <span className="mx-1">•</span>
+                    <span className="font-label-md text-label-md">
+                      {activeTask.estimated_minutes} min est.
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <hr className="border-outline-variant/50 w-16" />
+          
+          {/* Coming Up Next */}
+          <div>
+            <h3 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-4">Coming Up Next</h3>
+            {upcomingTasks.length > 0 ? (
+              <ul className="space-y-4">
+                {upcomingTasks.map(t => (
+                  <li key={t.id} className="flex items-start gap-3">
+                    <div className="w-5 h-5 rounded border border-outline-variant mt-0.5 shrink-0 bg-surface-container"></div>
+                    <span className="font-body-md text-body-md text-on-surface">{t.title}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-body-md text-on-surface-variant italic">No upcoming tasks.</p>
+            )}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
