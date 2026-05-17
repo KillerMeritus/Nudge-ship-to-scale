@@ -12,6 +12,7 @@ LOCK_FILE     = Path(__file__).parent.parent / "data" / "settings.json.lock"
 SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 DEFAULTS = {
+    # Phase 1
     "gemini_api_key": "",
     "work_duration_minutes": 25,
     "short_break_minutes": 5,
@@ -22,6 +23,10 @@ DEFAULTS = {
     "distraction_detection_enabled": True,
     "idle_threshold_seconds": 120,
     "distraction_whitelist": [],
+    # Phase 2
+    "ai_model": "gemini",               # "gemini" | "ollama"
+    "ollama_model": "gemma",            # model name pulled in Ollama
+    "distraction_cooldown_seconds": 180, # min gap between alerts for same app+task combo
 }
 
 

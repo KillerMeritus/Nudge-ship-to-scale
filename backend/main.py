@@ -10,7 +10,7 @@ from datetime import date
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routers import health, activity, tasks, timer, summary, settings, distraction
+from backend.routers import health, activity, tasks, timer, summary, settings, distraction, scraper_control
 from backend.storage.task_store import load_tasks, save_tasks
 
 # ── LOGGING ───────────────────────────────────────────────────────────────────
@@ -83,3 +83,4 @@ app.include_router(timer.router)
 app.include_router(summary.router)
 app.include_router(settings.router)
 app.include_router(distraction.router)
+app.include_router(scraper_control.router)

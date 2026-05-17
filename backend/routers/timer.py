@@ -1,6 +1,9 @@
 """
 Timer router — in-memory Pomodoro state.
 State resets on server restart (Phase 1, by design).
+
+Phase 2 addition:
+  GET /timer/active-task  — returns the currently running task from shared state
 """
 
 import logging
@@ -9,6 +12,7 @@ logger = logging.getLogger(__name__)
 import time
 from fastapi import APIRouter
 from backend.storage.settings_store import load_settings
+from backend import state
 
 router = APIRouter(prefix="/timer", tags=["timer"])
 
@@ -111,3 +115,15 @@ async def get_timer_status():
         "remaining_seconds": _remaining(),
         "session_count": _state["session_count"],
     }
+
+
+@router.get("/active-task")
+async def get_active_task():
+    """
+    Returns the currently running task object, or null.
+    Used by:
+      - FE-1 to display task title + elapsed time in the Current Task tab
+      - FE-2 tray to show active task name
+      - BE-2 distraction loop to decide whether to run AI checks
+    """
+    return state.get_active_task()
