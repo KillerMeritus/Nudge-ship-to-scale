@@ -9,6 +9,8 @@ use tauri::{
     AppHandle, Emitter, Manager, WindowEvent,
 };
 
+use tauri_plugin_notification::NotificationExt;
+
 // ── Health-check constants ────────────────────────────────────────────────────
 /// URL polled until the FastAPI sidecar signals it is ready.
 const HEALTH_URL: &str = "http://127.0.0.1:8080/health";
@@ -24,8 +26,10 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
 // its state here. The tray menu reads it when rebuilding the label.
 
 #[derive(Clone)]
-struct TimerState {
-    label: String, // e.g. "Focus: 22:14 remaining" or "Idle"
+struct TrayState {
+    timer_label: String, // e.g. "Focus: 22:14 remaining" or "Idle"
+    active_task: String,
+    distraction_count: u32,
 }
 
 // ── Tauri command — called from JS Timer component every second ───────────────
@@ -37,18 +41,18 @@ struct TimerState {
 #[tauri::command]
 fn update_tray_timer(
     app: AppHandle,
-    state: tauri::State<Arc<Mutex<TimerState>>>,
+    state: tauri::State<Arc<Mutex<TrayState>>>,
     label: String,
 ) {
-    // Write the new label into shared state
-    {
-        let mut ts = state.lock().unwrap();
-        ts.label = label.clone();
-    }
+    let ts = {
+        let mut s = state.lock().unwrap();
+        s.timer_label = label.clone();
+        s.clone()
+    };
 
     // Rebuild the tray menu so the label item reflects the update.
     // We ignore errors here — tray menu rebuild is best-effort.
-    let _ = rebuild_tray_menu(&app, &label);
+    let _ = rebuild_tray_menu(&app, &ts);
 }
 
 // ── Tray menu builder ─────────────────────────────────────────────────────────
@@ -57,16 +61,22 @@ fn update_tray_timer(
 ///
 /// Called once at startup and again every time the timer label changes.
 /// Returns the new menu so the caller can attach it to the tray icon.
-fn rebuild_tray_menu(app: &AppHandle, timer_label: &str) -> tauri::Result<Menu<tauri::Wry>> {
+fn rebuild_tray_menu(app: &AppHandle, state: &TrayState) -> tauri::Result<Menu<tauri::Wry>> {
     let menu = Menu::new(app)?;
 
     // Item 0 — Live timer status (read-only display label)
-    let status_text = if timer_label.is_empty() {
+    let status_text = if state.timer_label.is_empty() {
         "Nudge — Idle".to_string()
     } else {
-        timer_label.to_string()
+        state.timer_label.clone()
     };
     let status = MenuItem::with_id(app, "status", &status_text, false, None::<&str>)?;
+
+    let task_text = format!("Task: {}", state.active_task);
+    let task_item = MenuItem::with_id(app, "task", &task_text, false, None::<&str>)?;
+
+    let dist_text = format!("Distractions today: {}", state.distraction_count);
+    let dist_item = MenuItem::with_id(app, "distractions", &dist_text, false, None::<&str>)?;
 
     // Item 1 — Separator-equivalent: disabled dash item
     let sep = MenuItem::with_id(app, "sep", "─────────────", false, None::<&str>)?;
@@ -84,6 +94,8 @@ fn rebuild_tray_menu(app: &AppHandle, timer_label: &str) -> tauri::Result<Menu<t
     let quit = MenuItem::with_id(app, "quit", "Quit Nudge", true, None::<&str>)?;
 
     menu.append(&status)?;
+    menu.append(&task_item)?;
+    menu.append(&dist_item)?;
     menu.append(&sep)?;
     menu.append(&open)?;
     menu.append(&start_focus)?;
@@ -102,30 +114,42 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
+fn to_iso(t: std::time::SystemTime) -> String {
+    let dt: chrono::DateTime<chrono::Utc> = t.into();
+    dt.to_rfc3339()
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Step 1 — Spawn the FastAPI/uvicorn sidecar in a separate OS process.
-    // The process is detached; Tauri does NOT own its lifecycle.
-    Command::new("backend/.venv/bin/python3")
-        .current_dir("..")
-        .args([
-            "-m",
-            "uvicorn",
-            "backend.main:app",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "8080",
-        ])
-        .spawn()
-        .expect("failed to start backend sidecar");
+    // The process is detached; Tauri does NOT own its lifecycle unless we kill it on quit.
+    let backend_child = Arc::new(Mutex::new(
+        Command::new("backend/.venv/bin/python3")
+            .current_dir("..")
+            .args([
+                "-m",
+                "uvicorn",
+                "backend.main:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8080",
+            ])
+            .spawn()
+            .expect("failed to start backend sidecar")
+    ));
+
+    let backend_child_ref = backend_child.clone();
 
     // Step 2 — Shared timer state accessible to both the Tauri command and the
     //          tray menu builder. Arc<Mutex<>> lets us share across threads safely.
-    let timer_state = Arc::new(Mutex::new(TimerState {
-        label: String::new(),
+    let tray_state = Arc::new(Mutex::new(TrayState {
+        timer_label: String::new(),
+        active_task: "No active task".to_string(),
+        distraction_count: 0,
     }));
+    let tray_state_clone = tray_state.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -136,8 +160,8 @@ pub fn run() {
         ))
         // Register the JS→Rust command
         .invoke_handler(tauri::generate_handler![update_tray_timer])
-        // Make TimerState available via tauri::State<>
-        .manage(timer_state)
+        // Make TrayState available via tauri::State<>
+        .manage(tray_state)
         .setup(|app| {
             let app_handle = app.handle().clone();
 
@@ -183,8 +207,8 @@ pub fn run() {
             }
 
             // ── Step 4: System tray setup ────────────────────────────────────
-            // Build the initial menu (timer label = empty → "Idle").
-            let initial_menu = rebuild_tray_menu(app.handle(), "")
+            let ts = tray_state_clone.lock().unwrap().clone();
+            let initial_menu = rebuild_tray_menu(app.handle(), &ts)
                 .expect("failed to build tray menu");
 
             // Load the 32×32 icon from the bundled icons directory.
@@ -232,6 +256,10 @@ pub fn run() {
                         }
                         "quit" => {
                             // Hard exit — this is intentional quit from tray.
+                            if let Ok(mut child) = backend_child_ref.lock() {
+                                let _ = child.kill();
+                                println!("[Nudge] Backend sidecar killed.");
+                            }
                             println!("[Nudge] Quit requested from tray menu.");
                             app.exit(0);
                         }
@@ -254,6 +282,167 @@ pub fn run() {
                             let _ = w.hide();
                             println!("[Nudge] Window hidden — app running in tray.");
                         }
+                    }
+                });
+            }
+
+            // ── Step 6: Sleep/Wake detection thread ──────────────────────────────────
+            {
+                let handle = app_handle.clone();
+                thread::spawn(move || {
+                    use std::time::SystemTime;
+
+                    let client = reqwest::blocking::Client::builder()
+                        .timeout(Duration::from_secs(5))
+                        .build()
+                        .expect("http client");
+
+                    const POLL: Duration = Duration::from_secs(5);
+                    const SLEEP_THRESHOLD: Duration = Duration::from_secs(30);
+
+                    let mut last_tick = SystemTime::now();
+                    let mut asleep = false;
+                    let mut slept_at: Option<SystemTime> = None;
+
+                    loop {
+                        thread::sleep(POLL);
+                        let now = SystemTime::now();
+                        let gap = now.duration_since(last_tick).unwrap_or_default();
+
+                        if gap > SLEEP_THRESHOLD && !asleep {
+                            // Machine was sleeping
+                            asleep = true;
+                            slept_at = Some(last_tick);
+                            println!("[Nudge] System sleep detected — gap: {}s", gap.as_secs());
+
+                            // Emit to React
+                            let _ = handle.emit("system-sleep", ());
+
+                            // Signal scraper to pause
+                            let _ = client
+                                .post("http://127.0.0.1:8080/scraper/pause")
+                                .send();
+
+                        } else if gap <= SLEEP_THRESHOLD && asleep {
+                            // Woke up
+                            asleep = false;
+                            let woke_at = now;
+                            let slept_at_ts = slept_at.unwrap_or(now);
+
+                            let slept_at_iso = to_iso(slept_at_ts);
+                            let woke_at_iso = to_iso(woke_at);
+                            let duration_secs = gap.as_secs() as i64;
+
+                            println!("[Nudge] System wake detected — slept for {}s", duration_secs);
+
+                            // Emit to React
+                            let _ = handle.emit("system-wake", serde_json::json!({
+                                "slept_at": slept_at_iso,
+                                "woke_at": woke_at_iso,
+                                "duration_seconds": duration_secs,
+                            }));
+
+                            // Signal scraper to resume
+                            let _ = client
+                                .post("http://127.0.0.1:8080/scraper/resume")
+                                .send();
+
+                            // Log sleep gap to BE-1 activity log
+                            let body = serde_json::json!({
+                                "slept_at": slept_at_iso,
+                                "woke_at": woke_at_iso,
+                                "duration_seconds": duration_secs,
+                            });
+                            let _ = client
+                                .post("http://127.0.0.1:8080/activity/sleep-gap")
+                                .json(&body)
+                                .send();
+
+                            // Health check backend
+                            if client.get("http://127.0.0.1:8080/health").send().is_err() {
+                                println!("[Nudge] WARNING: Backend not responding after wake — may need restart.");
+                                let _ = handle.emit("backend-offline", ());
+                            }
+                        }
+
+                        last_tick = now;
+                    }
+                });
+            }
+
+            // ── Step 7: Tray active-task + distraction poll ──────────────────────────
+            {
+                let handle = app_handle.clone();
+                let tray_ref = tray_state_clone.clone();
+
+                thread::spawn(move || {
+                    let client = reqwest::blocking::Client::builder()
+                        .timeout(Duration::from_secs(5))
+                        .build()
+                        .expect("http client");
+
+                    // Keep track of distractions we've already notified about
+                    let mut known_distraction_count: u32 = 0;
+
+                    loop {
+                        thread::sleep(Duration::from_secs(10));
+
+                        // Poll active task
+                        let active_task_label = client
+                            .get("http://127.0.0.1:8080/timer/active-task")
+                            .send()
+                            .ok()
+                            .and_then(|r| r.json::<serde_json::Value>().ok())
+                            .and_then(|v| v["title"].as_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| "No active task".to_string());
+
+                        // Poll distractions
+                        let dist_response = client
+                            .get("http://127.0.0.1:8080/distraction/today")
+                            .send()
+                            .ok()
+                            .and_then(|r| r.json::<serde_json::Value>().ok());
+
+                        let mut dist_count = 0;
+                        if let Some(v) = &dist_response {
+                            if let Some(arr) = v.as_array() {
+                                dist_count = arr.len() as u32;
+
+                                // Fire notification for new distractions
+                                if dist_count > known_distraction_count {
+                                    for i in known_distraction_count..dist_count {
+                                        if let Some(event) = arr.get(i as usize) {
+                                            let task_title = event["task_title"].as_str().unwrap_or("Unknown Task");
+                                            let app_name = event["app_name"].as_str().unwrap_or("Unknown App");
+                                            let reason = event["reason"].as_str().unwrap_or("You seem distracted.");
+
+                                            let body = format!("You switched to {} while working on \"{}\" — {}", app_name, task_title, reason);
+                                            let _ = handle.notification()
+                                                .builder()
+                                                .title("Hey, you seem distracted 👀")
+                                                .body(&body)
+                                                .show();
+                                            println!("[Nudge] Distraction notification shown: {}", body);
+                                        }
+                                    }
+                                    known_distraction_count = dist_count;
+                                } else if dist_count < known_distraction_count {
+                                    // Day reset or cleared
+                                    known_distraction_count = dist_count;
+                                }
+                            }
+                        }
+
+                        // Update shared tray state
+                        {
+                            let mut ts = tray_ref.lock().unwrap();
+                            ts.active_task = active_task_label;
+                            ts.distraction_count = dist_count;
+                        }
+
+                        // Rebuild tray
+                        let ts = tray_ref.lock().unwrap().clone();
+                        let _ = rebuild_tray_menu(&handle, &ts);
                     }
                 });
             }
