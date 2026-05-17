@@ -96,3 +96,21 @@ async def delete_task(task_id: str):
     save_tasks(new_tasks)
     logger.info("Task deleted: %s", task_id)
     return {"deleted": True}
+
+
+@router.post("/{task_id}/start")
+async def start_task(task_id: str):
+    logger.info("Task started: %s", task_id)
+    return {"status": "started"}
+
+
+@router.post("/{task_id}/pause")
+async def pause_task(task_id: str):
+    logger.info("Task paused: %s", task_id)
+    return {"status": "paused"}
+
+
+@router.post("/{task_id}/resume")
+async def resume_task(task_id: str):
+    logger.info("Task resumed: %s", task_id)
+    return {"status": "resumed"}
