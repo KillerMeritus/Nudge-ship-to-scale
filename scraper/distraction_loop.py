@@ -70,28 +70,33 @@ def _loop():
             if is_whitelisted(app_name):
                 continue
 
-            # Skip if we already checked this exact window and task
-            if (app_name == _last_checked_state["app_name"] and 
-                window_title == _last_checked_state["window_title"] and 
-                task["id"] == _last_checked_state["task_id"]):
+            # 5. Call AI — skip only if the same non-distracting window was already confirmed safe
+            # (avoids redundant AI calls for IDE, terminal, etc.)
+            # Do NOT skip if the window was previously distracted — cooldown handles re-alert timing.
+            combo_key = f"{app_name}:{task['id']}"
+            same_window = (
+                app_name == _last_checked_state["app_name"] and
+                window_title == _last_checked_state["window_title"] and
+                task["id"] == _last_checked_state["task_id"]
+            )
+            if same_window and not _last_checked_state.get("was_distracted"):
                 continue
 
-            # 5. Call AI
             result = classify_activity(task["title"], app_name, window_title, text_elements)
             if not result:
                 continue
-                
-            # Cache the state only after a successful AI call
+
+            is_distracted = bool(result.get("is_distracted"))
             _last_checked_state["app_name"] = app_name
             _last_checked_state["window_title"] = window_title
             _last_checked_state["task_id"] = task["id"]
-                
+            _last_checked_state["was_distracted"] = is_distracted
+
             # 7. Check if distracted
-            if not result.get("is_distracted"):
+            if not is_distracted:
                 continue
-                
+
             # 8. Check cooldown
-            combo_key = f"{app_name}:{task['id']}"
             last_alert = _cooldowns.get(combo_key, 0)
             now = time.time()
             if now - last_alert < 180:

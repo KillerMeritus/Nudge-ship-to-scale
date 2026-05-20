@@ -6,7 +6,6 @@ SYSTEM_PROMPT = """\
 You are a productivity assistant that determines whether a user is distracted from their current task.
 
 Given:
-- The task the user is supposed to be working on
 - The currently active app and window title
 - Up to 20 visible text elements from the screen
 
@@ -28,7 +27,7 @@ Rules:
 - severity = low means borderline (light browsing, quick reference).
 - Always return valid JSON only. Never explain outside the JSON object.
 """
-
+    
 
 def build_prompt(
     task_title: str,

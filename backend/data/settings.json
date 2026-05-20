@@ -10,7 +10,7 @@
   "idle_threshold_seconds": 120,
   "distraction_whitelist": [],
   "ai_model": "ollama",
-  "ollama_model": "llama3",
+  "ollama_model": "gemma3:1b",
   "distraction_cooldown_seconds": 180,
   "work_start_time": "09:00",
   "work_end_time": "17:00"

@@ -8,6 +8,7 @@ import CurrentTask from './components/CurrentTask/CurrentTask';
 import TaskList from './components/Tasks/TaskList';
 import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
+import DistractionToast from './components/DistractionToast/DistractionToast';
 import { sendPreset } from './utils/notify';
 import { playSound } from './utils/sound';
 
@@ -25,7 +26,7 @@ export default function App() {
   useEffect(() => {
     const fetchDistractions = async () => {
       try {
-        const res = await fetch('http://localhost:8080/distraction/today');
+        const res = await fetch('http://localhost:8080/distraction/today/count');
         if (res.ok) {
           const data = await res.json();
           setDistractionCount(data.count || 0);
@@ -108,6 +109,8 @@ export default function App() {
               {activeTab === 'settings' && <Settings />}
             </main>
           </div>
+
+          <DistractionToast />
         </SummaryProvider>
       </ActiveTaskProvider>
     </TimerProvider>

@@ -48,62 +48,78 @@ GEMINI_URL = (
 
 # ── PROMPT BUILDER ────────────────────────────────────────────────────────────
 
-def _build_prompt(activity_log: list, tasks: list, distractions: list) -> str:
+def _dedup_distractions(distractions: list) -> list:
+    if not distractions:
+        return []
+    
+    unique_dist = []
+    for d in distractions:
+        # Check if same app and window title as the last one
+        if unique_dist and unique_dist[-1].get('app_name') == d.get('app_name') and unique_dist[-1].get('window_title') == d.get('window_title'):
+            unique_dist[-1]['count'] = unique_dist[-1].get('count', 1) + 1
+        else:
+            new_d = d.copy()
+            new_d['count'] = 1
+            unique_dist.append(new_d)
+            
+    # Sort by count to show top distractions
+    unique_dist.sort(key=lambda x: x.get('count', 0), reverse=True)
+    return unique_dist
+
+def _build_ai_prompt(activity_log: list, tasks: list, distractions: list) -> str:
     tasks_text = "\n".join(
-        f"- {t['title']} | elapsed: {t.get('elapsed_seconds', 0) // 60}m"
-        f" | status: {t.get('status', '?')}"
+        f"- {t['title']} ({t.get('elapsed_seconds', 0) // 60} min, {t.get('status', '?')})"
         for t in tasks
-    ) or "No tasks recorded today."
+    ) or "No tasks recorded."
 
+    unique_dist = _dedup_distractions(distractions)[:10]
     dist_text = "\n".join(
-        f"- {d.get('timestamp', '')} | Working on: {d.get('task_title', '?')}"
-        f" | Switched to: {d.get('app_name', '?')}"
-        f" | {d.get('reason', '')}"
-        for d in distractions
-    ) or "No distractions recorded."
+        f"- {d.get('app_name', '?')}: \"{d.get('window_title', '')[:70]}\" (x{d.get('count', 1)} times)"
+        for d in unique_dist
+    ) or "None."
 
+    # Sample activity: first 5 and last 5 entries to show start/end of day
+    sample = activity_log[:5] + activity_log[-5:] if len(activity_log) > 10 else activity_log
     activity_text = "\n".join(
-        f"- {e.get('timestamp', '')}: {e.get('app_name', '')} — {e.get('window_title', '')}"
-        for e in activity_log[:100]   # cap at 100 entries to stay within token limits
-    ) or "No activity data captured."
+        f"- {e.get('app_name', '')}: {e.get('window_title', '')[:60]}"
+        for e in sample
+    ) or "No activity data."
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    return f"""You are a productivity coach. Write a concise daily summary (under 200 words) using ONLY the data provided below. Use actual task names and app names — no placeholders. Do not repeat instructions or add meta-commentary.
 
-    return f"""You are a productivity assistant. Generate a structured daily summary.
+Structure your response in exactly this order:
 
-Tasks worked on today:
+**Opening Hook** — 1-2 sentences naming the user's main focus today.
+
+**Core Takeaways**
+- Use 3-5 bullet points. **Bold** key phrases. Cover tasks done and top distractions.
+
+**Final Verdict** — 1 sentence wrapping up the day.
+
+End your entire response with this line and nothing after it:
+SCORE: X.X
+
+---
+TASKS:
 {tasks_text}
 
-Distraction events:
+TOP DISTRACTIONS:
 {dist_text}
 
-Activity log sample:
+ACTIVITY SAMPLE:
 {activity_text}
+"""
 
-Respond in this exact format:
-NUDGE DAILY SUMMARY — {today}
+def _build_final_markdown(tasks: list, distractions: list, ai_insights: str, score: float) -> str:
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Since AI is generating the full structured summary now, we just prepend the title and score
+    return f"""## NUDGE DAILY SUMMARY ({today})
 
-Productivity Score: X.X / 10
+**Productivity Score:** {score} / 10
 
-What You Worked On:
-- {{task}} — {{duration}} — {{apps used}}
-
-Deep Work Time: Xh Ym
-Distraction Time: Xh Ym
-
-Distraction Events:
-- {{time}} | Working on: {{task}} | Switched to: {{app}} | Duration: {{N}} mins
-
-Top Distractions:
-- {{app or pattern}}
-
-Biggest Pattern:
-- {{one specific observation}}
-
-One Suggestion for Tomorrow:
-- {{specific and actionable}}
-
-SCORE: X.X"""
+{ai_insights.strip()}
+"""
 
 
 # ── SCORE EXTRACTOR ───────────────────────────────────────────────────────────
@@ -196,16 +212,26 @@ async def generate_summary():
     # ── Load activity log ──────────────────────────────────────────────────────
     # Prefer snapshot (stable copy) over live log
     activity_log = []
+    today_str = datetime.now().strftime("%Y-%m-%d")
     source_file = SNAPSHOT_FILE if SNAPSHOT_FILE.exists() else DAILY_LOG_FILE
     if source_file.exists():
         try:
-            activity_log = json.loads(source_file.read_text(encoding="utf-8"))
-            logger.info("Loaded %d activity entries from %s.", len(activity_log), source_file.name)
+            full_log = json.loads(source_file.read_text(encoding="utf-8"))
+            activity_log = [e for e in full_log if e.get("timestamp", "").startswith(today_str)]
+            logger.info("Loaded %d activity entries from %s for today.", len(activity_log), source_file.name)
         except Exception as e:
             logger.warning("Could not read activity log (%s): %s", source_file.name, e)
 
     # ── Load tasks and distractions ───────────────────────────────────────────
-    tasks = load_tasks()
+    all_tasks = load_tasks()
+    tasks = []
+    for t in all_tasks:
+        if t.get("status") != "Done":
+            tasks.append(t)
+        else:
+            completed_at = str(t.get("completed_at", ""))
+            if completed_at.startswith(today_str):
+                tasks.append(t)
     try:
         from backend.routers.distraction import _alerts
         distractions = list(_alerts)
@@ -226,7 +252,7 @@ async def generate_summary():
         _latest_summary["generated_at"] = datetime.now().isoformat()
         return dict(_latest_summary)
 
-    prompt = _build_prompt(activity_log, tasks, distractions)
+    prompt = _build_ai_prompt(activity_log, tasks, distractions)
 
     # ── Call AI ────────────────────────────────────────────────────────────────
     if ai_model == "ollama":
@@ -256,7 +282,9 @@ async def generate_summary():
             logger.error("Gemini generation failed: %s", e)
             raise HTTPException(status_code=502, detail=f"Failed to generate summary: {str(e)}")
 
-    _latest_summary["summary"] = summary_text
+    final_markdown = _build_final_markdown(tasks, distractions, summary_text, score)
+
+    _latest_summary["summary"] = final_markdown
     _latest_summary["score"] = score
     _latest_summary["generated_at"] = datetime.now().isoformat()
     logger.info("Summary generated via %s — score: %s", ai_model, score)

@@ -101,7 +101,7 @@ async def clear_today_distractions():
     return {"cleared": count}
 
 
-@router.get("/today")
+@router.get("/today/count")
 async def get_today_count():
     """
     Returns the number of distractions recorded today.

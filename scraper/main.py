@@ -25,8 +25,7 @@ BACKEND_TASKS_FILE = ROOT.parent / "backend" / "data" / "tasks.json"
 # (rename across filesystems is not). PID suffix avoids clashes if two scraper
 # instances run accidentally.
 CURRENT_TMP   = DATA_DIR / f"current_activity.json.{os.getpid()}.tmp"
-DAILY_LOG_FILE          = DATA_DIR / "daily_log.json"
-PREVIOUS_DAY_LOG_FILE   = DATA_DIR / "previous_day_log.json"
+DAILY_LOG_FILE = DATA_DIR / "daily_log.json"
 
 
 def _write_current_atomic(entry: dict) -> None:
@@ -127,14 +126,18 @@ def _date_aware_reset() -> None:
     today = datetime.now().strftime("%Y-%m-%d")
 
     if first_date and first_date != today:
-        # Persist yesterday's log before wiping it
-        PREVIOUS_DAY_LOG_FILE.write_text(
+        # Save to an archive directory instead of a single previous_day_log.json
+        archive_dir = DATA_DIR / "logs"
+        archive_dir.mkdir(exist_ok=True)
+        archive_file = archive_dir / f"{first_date}.json"
+        
+        archive_file.write_text(
             json.dumps(_daily_log, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
         _daily_log = []
         DAILY_LOG_FILE.write_text("[]", encoding="utf-8")
-        print(f"[scraper] Date rolled over ({first_date} → {today}) — previous log saved.")
+        print(f"[scraper] Date rolled over ({first_date} → {today}) — archived log to logs/{archive_file.name}.")
 
 
 def _flush_log():

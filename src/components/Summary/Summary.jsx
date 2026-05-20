@@ -1,5 +1,5 @@
 import { useSummary } from '../../contexts/SummaryContext';
-import styles from './Summary.module.css';
+import ReactMarkdown from 'react-markdown';
 
 export default function Summary({ setActiveTab }) {
   const { summaryData, isGenerating, error, generateSummary } = useSummary();
@@ -17,42 +17,22 @@ export default function Summary({ setActiveTab }) {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Daily Summary</h2>
+    <div className="max-w-container-md mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col gap-stack-lg">
+      <header className="flex flex-col gap-unit">
+        <h1 className="font-headline-xl text-headline-xl text-on-surface">Daily Summary</h1>
+        <p className="font-body-md text-body-md text-on-surface-variant">
+          {summaryData?.generated_at ? new Date(summaryData.generated_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }) : "Your productivity overview"}
+        </p>
+      </header>
 
-        <button
-          className={styles.generateBtn}
-          onClick={generateSummary}
-          disabled={isGenerating}
-        >
-          {isGenerating ? "Generating..." : "✨ Generate Now"}
-        </button>
-      </div>
-
+      {/* Error Banner */}
       {error && (
-        <div className={styles.errorBanner} style={{
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          borderLeft: '4px solid var(--color-danger)',
-          padding: '1rem',
-          marginBottom: '1rem',
-          borderRadius: '4px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span style={{ color: 'var(--color-danger)' }}>{error}</span>
+        <div className="bg-error/10 border-l-4 border-error p-4 rounded-r-md flex justify-between items-center">
+          <span className="text-error font-body-md">{error}</span>
           {error.includes("Settings") && (
             <button 
               onClick={() => setActiveTab('settings')}
-              style={{
-                backgroundColor: 'var(--color-danger)',
-                color: 'white',
-                border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+              className="bg-error text-on-error px-4 py-1.5 rounded-md font-label-md hover:opacity-90 transition-opacity"
             >
               Go to Settings
             </button>
@@ -60,88 +40,68 @@ export default function Summary({ setActiveTab }) {
         </div>
       )}
 
-      <div className={styles.summaryCard}>
-        <div className={styles.cardHeader}>
-          <div className={styles.cardTitle}>
-            <span>🤖</span> AI Insights
+      {/* AI Insight Card */}
+      <div className="bg-surface-container-low border border-outline-variant rounded-xl p-stack-md flex flex-col gap-stack-sm shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-primary">
+            <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
+            <h2 className="font-label-lg font-bold uppercase tracking-wider">AI Insight</h2>
           </div>
-
-          <div className={styles.date}>
-            {summaryData?.generated_at
-              ? new Date(summaryData.generated_at).toLocaleDateString(
-                  "en-US",
-                  {
-                    weekday: "long",
-                    month: "short",
-                    day: "numeric",
-                  }
-                )
-              : "No summary yet"}
-          </div>
-          
-          {summaryData?.summary && (
-            <button
-              onClick={handleExportMarkdown}
-              style={{
-                backgroundColor: 'var(--color-bg-tertiary)',
-                color: 'var(--color-text)',
-                border: '1px solid var(--color-border)',
-                padding: '4px 12px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.85rem'
-              }}
-            >
-              📥 Export Markdown
-            </button>
-          )}
         </div>
-
-        <div className={styles.content}>
+        
+        <div className="font-body-lg text-body-lg text-on-surface leading-relaxed">
           {summaryData?.summary ? (
-            <pre
-              style={{
-                whiteSpace: "pre-wrap",
-                fontFamily: "inherit",
-                lineHeight: "1.6",
-              }}
-            >
-              {summaryData?.summary}
-            </pre>
+            <div className="prose prose-stone prose-lg max-w-none font-newsreader prose-h2:text-primary prose-h3:text-primary prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
+              <ReactMarkdown>{summaryData.summary}</ReactMarkdown>
+            </div>
           ) : (
-            <p>
-              No summary generated yet. Click{" "}
-              <strong>Generate Now</strong> to create your AI productivity
-              summary.
+            <p className="italic text-on-surface-variant">
+              No summary generated yet. Click "Generate Now" below to create your AI productivity summary.
             </p>
           )}
         </div>
+      </div>
 
-        <div className={styles.metrics}>
-          <div className={styles.metricBox}>
-            <div className={styles.metricValue}>
-              {summaryData?.score
-                ? `${summaryData.score}/10`
-                : "--"}
-            </div>
-
-            <div className={styles.metricLabel}>
-              Productivity Score
-            </div>
+      {/* Metrics Row */}
+      <div className="grid grid-cols-2 gap-stack-md">
+        <div className="bg-surface-container-low border border-outline-variant rounded-xl p-stack-sm flex flex-col items-center justify-center gap-unit text-center">
+          <div className="font-headline-xl text-headline-xl text-on-surface">
+            {summaryData?.score ? `${summaryData.score}/10` : "--"}
           </div>
-
-          <div className={styles.metricBox}>
-            <div className={styles.metricValue}>
-              {summaryData?.generated_at
-                ? "Generated"
-                : "Waiting"}
-            </div>
-
-            <div className={styles.metricLabel}>
-              Summary Status
-            </div>
+          <div className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
+            Productivity Score
           </div>
         </div>
+        
+        <div className="bg-surface-container-low border border-outline-variant rounded-xl p-stack-sm flex flex-col items-center justify-center gap-unit text-center">
+          <div className="font-headline-xl text-[2rem] text-on-surface">
+            {summaryData?.generated_at ? "Done" : "Waiting"}
+          </div>
+          <div className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
+            Status
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col sm:flex-row items-center gap-4 mt-stack-md">
+        <button
+          onClick={generateSummary}
+          disabled={isGenerating}
+          className="w-full sm:w-auto px-8 py-3 bg-primary text-on-primary font-label-lg rounded-lg hover:bg-surface-tint disabled:opacity-50 transition-colors shadow-sm"
+        >
+          {isGenerating ? "Generating..." : "✨ Generate Now"}
+        </button>
+        
+        {summaryData?.summary && (
+          <button
+            onClick={handleExportMarkdown}
+            className="w-full sm:w-auto px-4 py-3 text-primary hover:underline font-label-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[20px]">download</span>
+            Export to Markdown
+          </button>
+        )}
       </div>
     </div>
   );

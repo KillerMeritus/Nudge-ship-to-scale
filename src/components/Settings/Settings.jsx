@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
-import styles from './Settings.module.css';
 
 export default function Settings() {
   const [aiModel, setAiModel] = useState('gemini');
@@ -28,59 +27,60 @@ export default function Settings() {
   }, []);
 
   const handleSave = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  try {
-    const response = await fetch("http://localhost:8080/settings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ai_model: aiModel,
-        gemini_api_key: apiKey,
-        work_start_time: workStartTime,
-        work_end_time: workEndTime,
-        launch_on_startup: launchOnStartup,
-      }),
-    });
+    try {
+      const response = await fetch("http://localhost:8080/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ai_model: aiModel,
+          gemini_api_key: apiKey,
+          work_start_time: workStartTime,
+          work_end_time: workEndTime,
+          launch_on_startup: launchOnStartup,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
+      console.log("Saved to backend:", data);
 
-    console.log("Saved to backend:", data);
-
-    // Apply OS autostart registration
-    if (window.__TAURI_INTERNALS__) {
-      if (launchOnStartup) {
-        await enable();
-      } else {
-        await disable();
+      if (window.__TAURI_INTERNALS__) {
+        if (launchOnStartup) {
+          await enable();
+        } else {
+          await disable();
+        }
       }
-    }
 
-    alert("Settings saved successfully!");
-  } catch (error) {
-    console.error("Settings save failed:", error);
-  }
-};
+      alert("Settings saved successfully!");
+    } catch (error) {
+      console.error("Settings save failed:", error);
+    }
+  };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Settings</h2>
-      </div>
+    <div className="max-w-container-md mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col gap-stack-lg">
+      <header className="flex flex-col gap-unit">
+        <h1 className="font-headline-xl text-headline-xl text-on-surface">Settings</h1>
+        <p className="font-body-lg text-body-lg text-on-surface-variant">Configure Nudge to fit your workflow.</p>
+      </header>
 
-      <form onSubmit={handleSave}>
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>🤖 AI Configuration</h3>
+      <form onSubmit={handleSave} className="flex flex-col gap-stack-lg">
+        
+        {/* AI Configuration */}
+        <section className="flex flex-col gap-stack-sm">
+          <h2 className="font-headline-lg text-headline-lg text-on-surface">AI Configuration</h2>
+          <p className="font-body-md text-body-md text-on-surface-variant mb-unit">
+            Choose how Nudge analyzes your productivity.
+          </p>
           
-          <div className={styles.formGroup}>
-            <label className={styles.label}>AI Model</label>
+          <div className="flex flex-col gap-2">
+            <label className="font-label-md text-on-surface">AI Model</label>
             <select
-              className={styles.input}
               value={aiModel}
               onChange={(e) => setAiModel(e.target.value)}
-              style={{ padding: '0.75rem', backgroundColor: 'var(--color-bg-secondary)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: '0.5rem', width: '100%' }}
+              className="bg-surface-container-low border border-outline-variant rounded-md px-4 py-3 font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
             >
               <option value="gemini">Google Gemini (Requires API Key)</option>
               <option value="ollama">Local Ollama (Requires Ollama running)</option>
@@ -88,79 +88,98 @@ export default function Settings() {
           </div>
 
           {aiModel === 'gemini' && (
-            <div className={styles.formGroup}>
-              <label htmlFor="apiKey" className={styles.label}>Gemini API Key</label>
+            <div className="flex flex-col gap-2 mt-unit">
+              <label htmlFor="apiKey" className="font-label-md text-on-surface">Gemini API Key</label>
               <input 
                 type="password" 
                 id="apiKey"
-                className={styles.input}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="AIzaSy..."
+                className="bg-surface-container-low border border-outline-variant rounded-md px-4 py-3 font-body-md text-on-surface placeholder-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
               />
-              <p className={styles.helpText}>Required for daily productivity summaries. Your key is stored securely on your device.</p>
+              <p className="font-label-sm text-on-surface-variant italic mt-1">
+                Required for daily productivity summaries. Your key is stored securely on your device.
+              </p>
             </div>
           )}
           
           {aiModel === 'ollama' && (
-            <div className={styles.formGroup}>
-              <p className={styles.helpText} style={{ color: 'var(--color-text-muted)' }}>
-                Nudge will connect to your local Ollama instance at <code>http://127.0.0.1:11434</code> using the <code>llama3</code> model. No API key needed.
+            <div className="bg-surface-variant/30 border border-outline-variant rounded-md p-4 mt-unit">
+              <p className="font-body-md text-on-surface-variant">
+                Nudge will connect to your local Ollama instance at <code className="font-mono text-sm bg-surface-container px-1 rounded">http://127.0.0.1:11434</code> using the <code className="font-mono text-sm bg-surface-container px-1 rounded">qwen2.5:0.5b</code> model (ultra-fast, tiny). No API key needed.
               </p>
             </div>
           )}
-        </div>
+        </section>
 
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>🚀 System</h3>
+        <hr className="border-outline-variant/50" />
+
+        {/* System Settings */}
+        <section className="flex flex-col gap-stack-sm">
+          <h2 className="font-headline-lg text-headline-lg text-on-surface">System</h2>
           
-          <div className={styles.formGroup}>
-            <label className={styles.label}>
+          <label className="flex items-center gap-3 cursor-pointer group mt-unit">
+            <div className="relative">
               <input 
                 type="checkbox" 
                 checked={launchOnStartup}
                 onChange={(e) => setLaunchOnStartup(e.target.checked)}
-                style={{ marginRight: '8px' }}
+                className="sr-only peer"
               />
-              Launch Nudge on startup
-            </label>
-            <p className={styles.helpText}>App will start silently in the menu bar on macOS login.</p>
-          </div>
-        </div>
+              <div className="w-11 h-6 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-surface-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-lg text-on-surface">Launch Nudge on startup</span>
+              <span className="font-label-sm text-on-surface-variant">App will start silently in the menu bar on macOS login.</span>
+            </div>
+          </label>
+        </section>
 
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>⏰ Work Hours</h3>
+        <hr className="border-outline-variant/50" />
+
+        {/* Work Hours */}
+        <section className="flex flex-col gap-stack-sm">
+          <h2 className="font-headline-lg text-headline-lg text-on-surface">Work Hours</h2>
+          <p className="font-body-md text-body-md text-on-surface-variant mb-unit">
+            Scraping automatically pauses outside of work hours.
+          </p>
           
-          <div className={styles.formGroup}>
-            <label htmlFor="startTime" className={styles.label}>Start Time</label>
-            <input 
-              type="time" 
-              id="startTime"
-              className={styles.input}
-              value={workStartTime}
-              onChange={(e) => setWorkStartTime(e.target.value)}
-            />
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-stack-md">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="startTime" className="font-label-md text-on-surface">Start Time</label>
+              <input 
+                type="time" 
+                id="startTime"
+                value={workStartTime}
+                onChange={(e) => setWorkStartTime(e.target.value)}
+                className="bg-surface-container-low border border-outline-variant rounded-md px-4 py-3 font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+              />
+            </div>
 
-          <div className={styles.formGroup}>
-            <label htmlFor="endTime" className={styles.label}>End Time</label>
-            <input 
-              type="time" 
-              id="endTime"
-              className={styles.input}
-              value={workEndTime}
-              onChange={(e) => setWorkEndTime(e.target.value)}
-            />
-            <p className={styles.helpText}>Scraping automatically pauses outside of work hours.</p>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="endTime" className="font-label-md text-on-surface">End Time</label>
+              <input 
+                type="time" 
+                id="endTime"
+                value={workEndTime}
+                onChange={(e) => setWorkEndTime(e.target.value)}
+                className="bg-surface-container-low border border-outline-variant rounded-md px-4 py-3 font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+              />
+            </div>
           </div>
+        </section>
+
+        {/* Actions */}
+        <div className="flex justify-end pt-stack-sm">
+          <button 
+            type="submit" 
+            className="px-8 py-3 bg-primary text-on-primary font-label-lg rounded-lg hover:bg-surface-tint transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
+          >
+            Save Preferences
+          </button>
         </div>
-
-        <button type="submit" className={styles.saveBtn}>Save Settings</button>
       </form>
-
-      <div className={styles.footer}>
-        <p>Nudge v0.1.0 • Privacy First</p>
-      </div>
     </div>
   );
 }

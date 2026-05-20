@@ -55,6 +55,8 @@ export default {
         "on-error":                 "#ffffff",
         "error-container":          "#ffdad6",
         "on-error-container":       "#93000a",
+        "warning":                  "#7a5c00",
+        "on-warning":               "#ffffff",
       },
       borderRadius: {
         "DEFAULT": "0.5rem",
@@ -92,7 +94,18 @@ export default {
       maxWidth: {
         "reading": "720px",
       },
+      keyframes: {
+        "slide-up": {
+          "0%":   { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "slide-up": "slide-up 0.2s ease-out",
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 }

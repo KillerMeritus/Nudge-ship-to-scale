@@ -382,7 +382,9 @@ pub fn run() {
                         .build()
                         .expect("http client");
 
-                    // Keep track of distractions we've already notified about
+                    // Baseline set on first successful poll — prevents spamming
+                    // alerts that already existed before this Tauri session started.
+                    let mut initialized = false;
                     let mut known_distraction_count: u32 = 0;
 
                     loop {
@@ -397,7 +399,7 @@ pub fn run() {
                             .and_then(|v| v["title"].as_str().map(|s| s.to_string()))
                             .unwrap_or_else(|| "No active task".to_string());
 
-                        // Poll distractions
+                        // Poll distractions — array is newest-first (appendleft in BE)
                         let dist_response = client
                             .get("http://127.0.0.1:8080/distraction/today")
                             .send()
@@ -409,26 +411,33 @@ pub fn run() {
                             if let Some(arr) = v.as_array() {
                                 dist_count = arr.len() as u32;
 
-                                // Fire notification for new distractions
-                                if dist_count > known_distraction_count {
-                                    for i in known_distraction_count..dist_count {
-                                        if let Some(event) = arr.get(i as usize) {
-                                            let task_title = event["task_title"].as_str().unwrap_or("Unknown Task");
-                                            let app_name = event["app_name"].as_str().unwrap_or("Unknown App");
-                                            let reason = event["reason"].as_str().unwrap_or("You seem distracted.");
+                                if !initialized {
+                                    // First successful poll — set baseline without notifying.
+                                    known_distraction_count = dist_count;
+                                    initialized = true;
+                                } else if dist_count > known_distraction_count {
+                                    // New alerts are prepended (index 0 = newest), so take
+                                    // from the front of the array.
+                                    let new_count = (dist_count - known_distraction_count) as usize;
+                                    for event in arr.iter().take(new_count) {
+                                        let task_title = event["task_title"].as_str().unwrap_or("Unknown Task");
+                                        let app_name = event["app_name"].as_str().unwrap_or("Unknown App");
+                                        let reason = event["reason"].as_str().unwrap_or("You seem distracted.");
 
-                                            let body = format!("You switched to {} while working on \"{}\" — {}", app_name, task_title, reason);
-                                            let _ = handle.notification()
-                                                .builder()
-                                                .title("Hey, you seem distracted 👀")
-                                                .body(&body)
-                                                .show();
-                                            println!("[Nudge] Distraction notification shown: {}", body);
-                                        }
+                                        let body = format!(
+                                            "{} — working on \"{}\"",
+                                            app_name, task_title
+                                        );
+                                        let _ = handle.notification()
+                                            .builder()
+                                            .title("Distraction detected")
+                                            .body(&body)
+                                            .show();
+                                        println!("[Nudge] Distraction notification: {} | {}", body, reason);
                                     }
                                     known_distraction_count = dist_count;
                                 } else if dist_count < known_distraction_count {
-                                    // Day reset or cleared
+                                    // Day reset or manual clear
                                     known_distraction_count = dist_count;
                                 }
                             }

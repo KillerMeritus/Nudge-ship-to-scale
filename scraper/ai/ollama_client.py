@@ -23,9 +23,9 @@ _warned_offline = False
 def _model_name() -> str:
     try:
         data = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
-        return data.get("ollama_model") or "gemma"
+        return data.get("ollama_model") or "gemma3:1b"
     except Exception:
-        return "gemma"
+        return "gemma3:1b"
 
 
 def call(
@@ -47,6 +47,7 @@ def call(
         "model":  _model_name(),
         "prompt": prompt,
         "stream": False,
+        "format": "json",
         "options": {"temperature": 0.1, "num_predict": 256},
     }
 
