@@ -219,6 +219,17 @@ export async function getLatestSummary() {
   return request('GET', '/summary/latest');
 }
 
+export async function exportSummary(markdown) {
+  if (USE_MOCKS) {
+    return {
+      success: true,
+      filepath: `/Users/mock-user/Downloads/nudge-summary-${new Date().toISOString().split('T')[0]}.md`,
+      filename: `nudge-summary-${new Date().toISOString().split('T')[0]}.md`,
+    };
+  }
+  return request('POST', '/summary/export', { markdown });
+}
+
 // ─────────────────────────────────────────────
 // SETTINGS
 // ─────────────────────────────────────────────

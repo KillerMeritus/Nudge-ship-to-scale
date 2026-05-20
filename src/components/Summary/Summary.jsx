@@ -1,19 +1,46 @@
+import { useState } from 'react';
 import { useSummary } from '../../contexts/SummaryContext';
 import ReactMarkdown from 'react-markdown';
+import { exportSummary } from '../../api/client';
+import { sendNotification } from '../../utils/notify';
 
 export default function Summary({ setActiveTab }) {
   const { summaryData, isGenerating, error, generateSummary } = useSummary();
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState(null);
+  const [exportError, setExportError] = useState(null);
 
-  const handleExportMarkdown = () => {
+  const handleExportMarkdown = async () => {
     if (!summaryData?.summary) return;
     
-    const blob = new Blob([summaryData.summary], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nudge-summary-${new Date().toISOString().split('T')[0]}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    setIsExporting(true);
+    setExportMessage(null);
+    setExportError(null);
+    
+    try {
+      const res = await exportSummary(summaryData.summary);
+      if (res.success) {
+        setExportMessage(`Saved to ${res.filepath}`);
+        
+        // Native desktop notification
+        await sendNotification({
+          title: '📥 Summary Exported',
+          body: `Saved as ${res.filename} in your Downloads folder.`,
+        });
+        
+        // Automatically clear success message after 6 seconds
+        setTimeout(() => {
+          setExportMessage(null);
+        }, 6000);
+      } else {
+        throw new Error('Export failed');
+      }
+    } catch (err) {
+      console.error('Failed to export summary:', err);
+      setExportError(err.message || 'Failed to export summary');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -96,13 +123,33 @@ export default function Summary({ setActiveTab }) {
         {summaryData?.summary && (
           <button
             onClick={handleExportMarkdown}
-            className="w-full sm:w-auto px-4 py-3 text-primary hover:underline font-label-lg transition-colors flex items-center justify-center gap-2"
+            disabled={isExporting}
+            className="w-full sm:w-auto px-4 py-3 text-primary hover:underline font-label-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[20px]">download</span>
-            Export to Markdown
+            <span className="material-symbols-outlined text-[20px]">
+              {isExporting ? "hourglass_empty" : "download"}
+            </span>
+            {isExporting ? "Exporting..." : "Export to Markdown"}
           </button>
         )}
       </div>
+
+      {/* Export Success/Error Feedback */}
+      {(exportMessage || exportError) && (
+        <div className="animate-slide-up flex items-center gap-2 mt-2 px-1">
+          {exportMessage ? (
+            <>
+              <span className="material-symbols-outlined text-tertiary text-[20px]">check_circle</span>
+              <span className="text-tertiary font-body-md text-sm">{exportMessage}</span>
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-error text-[20px]">error</span>
+              <span className="text-error font-body-md text-sm">{exportError}</span>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

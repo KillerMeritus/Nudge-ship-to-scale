@@ -18,11 +18,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 import json
+import os
 import urllib.request
 import urllib.error
 from pathlib import Path
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from backend.storage.settings_store import load_settings
 from backend.storage.task_store import load_tasks
 
@@ -294,3 +296,61 @@ async def generate_summary():
 @router.get("/latest")
 async def get_latest_summary():
     return dict(_latest_summary)
+
+
+class SummaryExportRequest(BaseModel):
+    markdown: str
+
+
+def get_downloads_path() -> Path:
+    # macOS / Linux default
+    downloads = Path.home() / "Downloads"
+    if downloads.exists() and downloads.is_dir():
+        return downloads
+    
+    # Windows registry lookup
+    if os.name == "nt":
+        try:
+            import winreg
+            sub_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
+            downloads_guid = "{374DE290-123F-4565-9164-39C4925E467B}"
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
+                location = winreg.QueryValueEx(key, downloads_guid)[0]
+                win_downloads = Path(location)
+                if win_downloads.exists() and win_downloads.is_dir():
+                    return win_downloads
+        except Exception as e:
+            logger.warning("Failed to look up Windows Downloads folder from registry: %s", e)
+            
+    # Fallback to home directory
+    return Path.home()
+
+
+@router.post("/export")
+async def export_summary(req: SummaryExportRequest):
+    try:
+        downloads_dir = get_downloads_path()
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        base_name = f"nudge-summary-{today}"
+        ext = ".md"
+        file_path = downloads_dir / f"{base_name}{ext}"
+        
+        counter = 1
+        while file_path.exists():
+            file_path = downloads_dir / f"{base_name} ({counter}){ext}"
+            counter += 1
+            
+        file_path.write_text(req.markdown, encoding="utf-8")
+        logger.info("Successfully exported summary to %s", file_path)
+        return {
+            "success": True,
+            "filepath": str(file_path),
+            "filename": file_path.name
+        }
+    except Exception as e:
+        logger.error("Failed to write summary export file: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save file: {str(e)}"
+        )
