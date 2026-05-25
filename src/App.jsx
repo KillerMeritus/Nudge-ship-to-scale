@@ -11,6 +11,7 @@ import Settings from './components/Settings/Settings';
 import DistractionToast from './components/DistractionToast/DistractionToast';
 import { sendPreset } from './utils/notify';
 import { playSound } from './utils/sound';
+import { getDistractionCount } from './api/client';
 
 const TABS = [
   { id: 'timer',    icon: 'timer',       label: 'Timer' },
@@ -26,11 +27,8 @@ export default function App() {
   useEffect(() => {
     const fetchDistractions = async () => {
       try {
-        const res = await fetch('http://localhost:8080/distraction/today/count');
-        if (res.ok) {
-          const data = await res.json();
-          setDistractionCount(data.count || 0);
-        }
+        const data = await getDistractionCount();
+        setDistractionCount(data?.count || 0);
       } catch (err) {
         console.error('Failed to fetch distraction count', err);
       }

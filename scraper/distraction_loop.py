@@ -1,3 +1,14 @@
+"""
+distraction_loop.py — Background thread that checks if the user is distracted.
+
+Runs every 10 seconds. Reads settings dynamically each cycle:
+  - distraction_detection_enabled (on/off)
+  - distraction_cooldown_seconds (per-app-per-task alert gap)
+  - distraction_whitelist (user-defined apps to ignore)
+
+Requires an active task (via GET /timer/active-task) to run.
+"""
+
 import time
 import json
 import urllib.request
@@ -11,10 +22,24 @@ from scraper.whitelist import is_whitelisted
 ROOT = Path(__file__).parent
 DATA_DIR = ROOT / "data"
 CURRENT_FILE = DATA_DIR / "current_activity.json"
+SETTINGS_FILE = ROOT.parent / "backend" / "data" / "settings.json"
 
 _cooldowns = {}
 _distraction_thread = None
 _running = False
+
+
+# ── Settings reader ───────────────────────────────────────────────────────────
+
+def _read_settings() -> dict:
+    """Read settings.json — returns defaults on any failure."""
+    try:
+        return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+# ── Active task check ─────────────────────────────────────────────────────────
 
 def _check_active_task():
     try:
@@ -24,6 +49,9 @@ def _check_active_task():
             return data
     except Exception:
         return None
+
+
+# ── Alert sender ──────────────────────────────────────────────────────────────
 
 def _send_alert(alert_data):
     try:
@@ -37,6 +65,9 @@ def _send_alert(alert_data):
     except Exception as e:
         print(f"[distraction_loop] Failed to send alert: {e}")
 
+
+# ── Main loop ─────────────────────────────────────────────────────────────────
+
 _last_checked_state = {"app_name": None, "window_title": None, "task_id": None}
 
 def _loop():
@@ -46,12 +77,24 @@ def _loop():
         time.sleep(10)
         
         try:
-            # 1. Check active task
-            task = _check_active_task()
-            if not task:
+            # ── 0. Read settings ──────────────────────────────────────────
+            settings = _read_settings()
+
+            # Check if distraction detection is enabled
+            if not settings.get("distraction_detection_enabled", True):
                 continue
 
-            # 2. Read current_activity.json
+            cooldown_seconds = settings.get("distraction_cooldown_seconds", 180)
+            user_whitelist = settings.get("distraction_whitelist", [])
+
+            # ── 1. Check active task ──────────────────────────────────────
+            task = _check_active_task()
+            if not task:
+                # No active task — distraction detection requires one.
+                # This is by design: we need task context for AI classification.
+                continue
+
+            # ── 2. Read current_activity.json ─────────────────────────────
             if not CURRENT_FILE.exists():
                 continue
             
@@ -62,17 +105,21 @@ def _loop():
             window_title = activity.get("window_title", "")
             text_elements = activity.get("text_elements", [])
             
-            # 3. Skip communication apps
-            if app_name.lower() in ["zoom", "google meet", "microsoft teams", "slack", "webex"]:
+            # ── 3. Skip communication apps ────────────────────────────────
+            comm_apps = ["zoom", "google meet", "microsoft teams", "slack", "webex", "discord"]
+            if app_name.lower() in comm_apps:
                 continue
                 
-            # 4. Skip whitelisted apps
+            # ── 4. Skip whitelisted apps (hardcoded + user-defined) ───────
             if is_whitelisted(app_name):
                 continue
 
-            # 5. Call AI — skip only if the same non-distracting window was already confirmed safe
-            # (avoids redundant AI calls for IDE, terminal, etc.)
-            # Do NOT skip if the window was previously distracted — cooldown handles re-alert timing.
+            # Check user-defined whitelist (case-insensitive partial match)
+            app_lower = app_name.lower()
+            if any(w.lower() in app_lower for w in user_whitelist if w):
+                continue
+
+            # ── 5. Deduplicate: skip if same non-distracting window ───────
             combo_key = f"{app_name}:{task['id']}"
             same_window = (
                 app_name == _last_checked_state["app_name"] and
@@ -82,8 +129,11 @@ def _loop():
             if same_window and not _last_checked_state.get("was_distracted"):
                 continue
 
+            # ── 6. Call AI classifier ─────────────────────────────────────
+            print(f"[distraction_loop] Classifying: {app_name} | {window_title[:60]} | task: {task['title']}")
             result = classify_activity(task["title"], app_name, window_title, text_elements)
             if not result:
+                print(f"[distraction_loop] AI returned None — classification failed.")
                 continue
 
             is_distracted = bool(result.get("is_distracted"))
@@ -92,18 +142,24 @@ def _loop():
             _last_checked_state["task_id"] = task["id"]
             _last_checked_state["was_distracted"] = is_distracted
 
-            # 7. Check if distracted
+            print(f"[distraction_loop] AI result: distracted={is_distracted}, "
+                  f"confidence={result.get('confidence')}, "
+                  f"category={result.get('distraction_category')}, "
+                  f"severity={result.get('severity')}")
+
+            # ── 7. Not distracted → done ──────────────────────────────────
             if not is_distracted:
                 continue
 
-            # 8. Check cooldown
+            # ── 8. Check cooldown (user-configurable) ─────────────────────
             last_alert = _cooldowns.get(combo_key, 0)
             now = time.time()
-            if now - last_alert < 180:
-                print(f"[distraction_loop] Distracted by {app_name}, but still in 180s cooldown.")
+            if now - last_alert < cooldown_seconds:
+                remaining = int(cooldown_seconds - (now - last_alert))
+                print(f"[distraction_loop] Distracted by {app_name}, but in {cooldown_seconds}s cooldown ({remaining}s left).")
                 continue
                 
-            # 10. Send alert
+            # ── 9. Send alert to backend ──────────────────────────────────
             alert_data = {
                 "task_id": task["id"],
                 "task_title": task["title"],
@@ -116,12 +172,14 @@ def _loop():
             
             _send_alert(alert_data)
             
-            # 11. Update cooldown
+            # ── 10. Update cooldown ───────────────────────────────────────
             _cooldowns[combo_key] = now
-            print(f"[distraction_loop] Alert fired: {app_name} during '{task['title']}'")
+            print(f"[distraction_loop] ✓ ALERT FIRED: {app_name} during '{task['title']}' "
+                  f"(severity={result.get('severity')}, category={result.get('distraction_category')})")
             
         except Exception as e:
             print(f"[distraction_loop] Loop error: {e}")
+
 
 def start_distraction_loop():
     global _distraction_thread, _running

@@ -245,3 +245,31 @@ export async function saveSettings(changes) {
   }
   return request('POST', '/settings', changes);
 }
+
+// ─────────────────────────────────────────────
+// DISTRACTION
+// ─────────────────────────────────────────────
+export async function getDistractionCount() {
+  if (USE_MOCKS) return { count: 0 };
+  return request('GET', '/distraction/today/count');
+}
+
+export async function getDistractions() {
+  if (USE_MOCKS) return [];
+  return request('GET', '/distraction/today');
+}
+
+export async function getLatestDistraction() {
+  if (USE_MOCKS) return null;
+  return request('GET', '/distraction/latest');
+}
+
+export async function clearDistractions() {
+  if (USE_MOCKS) return { cleared: 0 };
+  return request('DELETE', '/distraction/today');
+}
+
+export async function markDistactionsSeen() {
+  if (USE_MOCKS) return { marked: 0 };
+  return request('POST', '/distraction/alerts/seen');
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { getLatestDistraction } from '../../api/client';
 
 const POLL_MS = 10_000;
 const AUTO_DISMISS_MS = 8_000;
@@ -11,9 +12,7 @@ export default function DistractionToast() {
   useEffect(() => {
     const poll = async () => {
       try {
-        const res = await fetch('http://localhost:8080/distraction/latest');
-        if (!res.ok) return;
-        const alert = await res.json();
+        const alert = await getLatestDistraction();
         if (!alert?.timestamp) return;
 
         // Show only if this is a newer alert than the last one we displayed
