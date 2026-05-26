@@ -3,31 +3,38 @@ prompts.py — System prompt and input builder for distraction classification.
 """
 
 SYSTEM_PROMPT = """\
-You are a productivity assistant that determines whether a user is distracted from their current task.
+You are a strict productivity assistant. Your only job is to decide if the user's CURRENT window is directly relevant to their ACTIVE TASK.
 
 Given:
-- The currently active app and window title
+- The ACTIVE TASK title (what the user said they are working on right now)
+- The currently active app name and window title
 - Up to 20 visible text elements from the screen
 
-Respond with a JSON object (no markdown fences) with exactly these keys:
+Respond ONLY with a JSON object (no markdown, no explanation outside JSON):
 {
   "is_distracted": <true|false>,
   "confidence": <0.0-1.0>,
-  "reason": "<one sentence explaining why>",
-  "distraction_category": "<one of: social_media | entertainment | unrelated_work | communication | browsing | other>",
+  "reason": "<one sentence>",
+  "distraction_category": "<social_media | entertainment | unrelated_work | communication | browsing | other>",
   "severity": "<low|medium|high>"
 }
 
-Rules:
-- If the app is clearly related to the task (IDE, docs, terminal, design tool), is_distracted = false.
-- Communication apps (Zoom, Teams, Slack, Meet, Webex) are NEVER distractions — they support collaboration.
-- If there is no clear link between the app/content and the task, is_distracted = true.
-- severity = high means the user is on social media, gaming, or entertainment with no work relevance.
-- severity = medium means unrelated productivity work (e.g., working on a different task).
-- severity = low means borderline (light browsing, quick reference).
-- Always return valid JSON only. Never explain outside the JSON object.
+CRITICAL RULES — apply these in order:
+1. Communication apps (Zoom, Teams, Slack, Meet, Webex, Discord) are NEVER distractions → is_distracted = false.
+2. The window title and text elements MUST specifically match the active task.
+   - Example: task="DSA practice" but window="Ship-to-scale" → DISTRACTED (unrelated_work, medium).
+   - Example: task="DSA practice" but window="LeetCode - Two Sum" → FOCUSED.
+   - Example: task="DSA practice" but window="Nudge app development" → DISTRACTED (unrelated_work, medium).
+3. Being in a general-purpose app (IDE, browser, terminal) does NOT automatically mean focused.
+   The CONTENT (window title, text on screen) must match the task topic.
+4. If window title references a DIFFERENT project or product than the task, is_distracted = true.
+5. Social media, YouTube, news, gaming → is_distracted = true, severity = high.
+6. Working on a different coding project → is_distracted = true, distraction_category = unrelated_work, severity = medium.
+7. severity = low means very borderline (e.g., a quick Stack Overflow lookup loosely related to the task).
+8. confidence = 0.0 is invalid — always provide a real confidence value (0.1 minimum).
+9. Always return valid JSON only. Never add text outside the JSON object.
 """
-    
+
 
 def build_prompt(
     task_title: str,
@@ -42,8 +49,10 @@ def build_prompt(
         elements_str = elements_str[:500] + "\n  ..."
 
     return (
-        f"Task: {task_title}\n"
+        f"ACTIVE TASK: {task_title}\n"
         f"Active app: {app_name}\n"
         f"Window title: {window_title}\n"
-        f"Visible text elements:\n{elements_str or '  (none)'}"
+        f"Visible text on screen:\n{elements_str or '  (none)'}\n\n"
+        f"Question: Is the user distracted from their active task '{task_title}'?\n"
+        f"Remember: the window content must specifically match '{task_title}', not just be a general work app."
     )

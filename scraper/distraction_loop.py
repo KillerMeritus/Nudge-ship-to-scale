@@ -96,7 +96,11 @@ def _send_alert(alert_data):
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
+# Tracks the last evaluation decision per (app_name + window_title + task_id) combo.
+# Also records the time of the last evaluation so we can force a re-check every
+# N minutes even when nothing changes (prevents a wrong AI verdict sticking forever).
 _last_checked_state = {"app_name": None, "window_title": None, "task_id": None}
+_RECHECK_INTERVAL_S = 300  # re-evaluate even identical windows every 5 minutes
 
 def _loop():
     global _last_checked_state
@@ -160,20 +164,29 @@ def _loop():
                 _log(f"Decision: Ignored '{app_name}' because it matched user whitelist keyword: '{matching_whitelist_item}'.", "INFO")
                 continue
 
-            # ── 5. Deduplicate: skip if same non-distracting window ───────
+            # ── 5. Deduplicate: skip if same non-distracting window (with time-based re-eval)
+            # Key includes both app AND window title — switching to a different file/tab
+            # in the same app must always trigger a fresh AI call.
             combo_key = f"{app_name}:{task['id']}"
-            same_window = (
-                app_name == _last_checked_state["app_name"] and
-                window_title == _last_checked_state["window_title"] and
-                task["id"] == _last_checked_state["task_id"]
-            )
+            dedup_key = f"{app_name}::{window_title}::{task['id']}"
             
-            if same_window:
+            same_window = (dedup_key == _last_checked_state.get("dedup_key"))
+            last_eval_time = _last_checked_state.get("last_eval_time", 0)
+            time_since_eval = time.time() - last_eval_time
+            due_for_recheck = time_since_eval >= _RECHECK_INTERVAL_S
+            
+            if same_window and not due_for_recheck:
                 if not _last_checked_state.get("was_distracted"):
-                    _log(f"Decision: Ignored '{app_name}' because this exact window was already classified as 'Not Distracting' in this task session.", "DEBUG")
+                    _log(
+                        f"Decision: Skipped re-evaluation of '{app_name}' (same window, last checked "
+                        f"{int(time_since_eval)}s ago, recheck due in {int(_RECHECK_INTERVAL_S - time_since_eval)}s).",
+                        "DEBUG"
+                    )
                     continue
                 else:
-                    _log(f"Deduplication: Same active distracting window as last tick ('{app_name}'), checking cooldown.", "DEBUG")
+                    _log(f"Deduplication: Same distracting window '{app_name}', checking cooldown.", "DEBUG")
+            elif same_window and due_for_recheck:
+                _log(f"Re-evaluating '{app_name}' — same window but {int(time_since_eval)}s have passed (periodic recheck).", "INFO")
 
             # ── 6. Call AI classifier ─────────────────────────────────────
             ai_model = settings.get("ai_model", "gemini").lower()
@@ -189,6 +202,8 @@ def _loop():
             _last_checked_state["window_title"] = window_title
             _last_checked_state["task_id"] = task["id"]
             _last_checked_state["was_distracted"] = is_distracted
+            _last_checked_state["dedup_key"] = dedup_key
+            _last_checked_state["last_eval_time"] = time.time()
 
             _log(f"AI decision complete: is_distracted={is_distracted} (Confidence: {result.get('confidence')})", "INFO")
             _log(f"AI Category: '{result.get('distraction_category')}' | Severity: '{result.get('severity')}' | Reason: '{result.get('reason')}'", "INFO")
