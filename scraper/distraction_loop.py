@@ -7,6 +7,7 @@ Runs every 10 seconds. Reads settings dynamically each cycle:
   - distraction_whitelist (user-defined apps to ignore)
 
 Requires an active task (via GET /timer/active-task) to run.
+Appends rich, detailed log statements to both the console and scraper/data/distraction.log.
 """
 
 import time
@@ -14,6 +15,7 @@ import json
 import urllib.request
 import urllib.error
 import threading
+from datetime import datetime
 from pathlib import Path
 
 from scraper.ai.ai_client import classify_activity
@@ -21,12 +23,33 @@ from scraper.whitelist import is_whitelisted
 
 ROOT = Path(__file__).parent
 DATA_DIR = ROOT / "data"
+DATA_DIR.mkdir(exist_ok=True)
+
 CURRENT_FILE = DATA_DIR / "current_activity.json"
 SETTINGS_FILE = ROOT.parent / "backend" / "data" / "settings.json"
+LOG_FILE = DATA_DIR / "distraction.log"
 
 _cooldowns = {}
 _distraction_thread = None
 _running = False
+
+
+# ── Unified Logger ────────────────────────────────────────────────────────────
+
+def _log(message: str, level: str = "INFO"):
+    """Log a message to the console and to scraper/data/distraction.log with timestamps."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    formatted = f"[{timestamp}] [{level}] [distraction_loop] {message}"
+    
+    # 1. Output to standard stdout for immediate terminal visibility
+    print(formatted)
+    
+    # 2. Append to persistent log file
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(formatted + "\n")
+    except Exception as e:
+        print(f"[{timestamp}] [ERROR] Failed to write to log file: {e}")
 
 
 # ── Settings reader ───────────────────────────────────────────────────────────
@@ -34,8 +57,11 @@ _running = False
 def _read_settings() -> dict:
     """Read settings.json — returns defaults on any failure."""
     try:
-        return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-    except Exception:
+        if SETTINGS_FILE.exists():
+            return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        return {}
+    except Exception as e:
+        _log(f"Failed to read settings.json: {e}", "WARNING")
         return {}
 
 
@@ -47,7 +73,8 @@ def _check_active_task():
         with urllib.request.urlopen(req, timeout=3) as res:
             data = json.loads(res.read().decode())
             return data
-    except Exception:
+    except Exception as e:
+        _log(f"Failed to check active task from backend: {e}", "DEBUG")
         return None
 
 
@@ -61,9 +88,10 @@ def _send_alert(alert_data):
             headers={"Content-Type": "application/json"}
         )
         with urllib.request.urlopen(req, timeout=3) as res:
-            pass
+            resp_data = json.loads(res.read().decode())
+            _log(f"✓ Alert successfully received by backend: {resp_data}", "SUCCESS")
     except Exception as e:
-        print(f"[distraction_loop] Failed to send alert: {e}")
+        _log(f"❌ Failed to send alert to backend: {e}", "ERROR")
 
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
@@ -72,7 +100,8 @@ _last_checked_state = {"app_name": None, "window_title": None, "task_id": None}
 
 def _loop():
     global _last_checked_state
-    print("[distraction_loop] Started background thread.")
+    _log("Background thread started successfully. Active checking begins...", "INFO")
+    
     while _running:
         time.sleep(10)
         
@@ -81,7 +110,9 @@ def _loop():
             settings = _read_settings()
 
             # Check if distraction detection is enabled
-            if not settings.get("distraction_detection_enabled", True):
+            enabled = settings.get("distraction_detection_enabled", True)
+            if not enabled:
+                _log("Checking skipped: Distraction detection is disabled in settings.", "DEBUG")
                 continue
 
             cooldown_seconds = settings.get("distraction_cooldown_seconds", 180)
@@ -90,33 +121,43 @@ def _loop():
             # ── 1. Check active task ──────────────────────────────────────
             task = _check_active_task()
             if not task:
-                # No active task — distraction detection requires one.
-                # This is by design: we need task context for AI classification.
+                _log("Checking skipped: No active task currently running (Start a task/timer in Nudge to activate detection).", "INFO")
                 continue
 
             # ── 2. Read current_activity.json ─────────────────────────────
             if not CURRENT_FILE.exists():
+                _log(f"Checking skipped: Activity snapshot file missing ({CURRENT_FILE.name}). Scraper might be initializing.", "WARNING")
                 continue
             
-            with open(CURRENT_FILE, "r", encoding="utf-8") as f:
-                activity = json.load(f)
+            try:
+                with open(CURRENT_FILE, "r", encoding="utf-8") as f:
+                    activity = json.load(f)
+            except Exception as e:
+                _log(f"Checking skipped: Failed to parse {CURRENT_FILE.name}: {e}", "WARNING")
+                continue
             
             app_name = activity.get("app_name", "")
             window_title = activity.get("window_title", "")
             text_elements = activity.get("text_elements", [])
             
+            _log(f"Current Activity detected — App: '{app_name}' | Title: '{window_title}' | Task: '{task['title']}'", "INFO")
+
             # ── 3. Skip communication apps ────────────────────────────────
             comm_apps = ["zoom", "google meet", "microsoft teams", "slack", "webex", "discord"]
             if app_name.lower() in comm_apps:
+                _log(f"Decision: Ignored '{app_name}' because it is classified as a whitelisted collaboration tool.", "INFO")
                 continue
                 
             # ── 4. Skip whitelisted apps (hardcoded + user-defined) ───────
             if is_whitelisted(app_name):
+                _log(f"Decision: Ignored '{app_name}' because it is in the system default whitelist.", "INFO")
                 continue
 
             # Check user-defined whitelist (case-insensitive partial match)
             app_lower = app_name.lower()
-            if any(w.lower() in app_lower for w in user_whitelist if w):
+            matching_whitelist_item = next((w for w in user_whitelist if w and w.lower() in app_lower), None)
+            if matching_whitelist_item:
+                _log(f"Decision: Ignored '{app_name}' because it matched user whitelist keyword: '{matching_whitelist_item}'.", "INFO")
                 continue
 
             # ── 5. Deduplicate: skip if same non-distracting window ───────
@@ -126,14 +167,21 @@ def _loop():
                 window_title == _last_checked_state["window_title"] and
                 task["id"] == _last_checked_state["task_id"]
             )
-            if same_window and not _last_checked_state.get("was_distracted"):
-                continue
+            
+            if same_window:
+                if not _last_checked_state.get("was_distracted"):
+                    _log(f"Decision: Ignored '{app_name}' because this exact window was already classified as 'Not Distracting' in this task session.", "DEBUG")
+                    continue
+                else:
+                    _log(f"Deduplication: Same active distracting window as last tick ('{app_name}'), checking cooldown.", "DEBUG")
 
             # ── 6. Call AI classifier ─────────────────────────────────────
-            print(f"[distraction_loop] Classifying: {app_name} | {window_title[:60]} | task: {task['title']}")
+            ai_model = settings.get("ai_model", "gemini").lower()
+            _log(f"Calling AI classifier ({ai_model}) to analyze app activity against task context...", "INFO")
+            
             result = classify_activity(task["title"], app_name, window_title, text_elements)
             if not result:
-                print(f"[distraction_loop] AI returned None — classification failed.")
+                _log(f"❌ AI classification call failed or returned an unparseable response. Verify your settings, internet connection, and API keys.", "ERROR")
                 continue
 
             is_distracted = bool(result.get("is_distracted"))
@@ -142,13 +190,12 @@ def _loop():
             _last_checked_state["task_id"] = task["id"]
             _last_checked_state["was_distracted"] = is_distracted
 
-            print(f"[distraction_loop] AI result: distracted={is_distracted}, "
-                  f"confidence={result.get('confidence')}, "
-                  f"category={result.get('distraction_category')}, "
-                  f"severity={result.get('severity')}")
+            _log(f"AI decision complete: is_distracted={is_distracted} (Confidence: {result.get('confidence')})", "INFO")
+            _log(f"AI Category: '{result.get('distraction_category')}' | Severity: '{result.get('severity')}' | Reason: '{result.get('reason')}'", "INFO")
 
             # ── 7. Not distracted → done ──────────────────────────────────
             if not is_distracted:
+                _log(f"Decision: User is in focus. Keep up the good work!", "INFO")
                 continue
 
             # ── 8. Check cooldown (user-configurable) ─────────────────────
@@ -156,10 +203,11 @@ def _loop():
             now = time.time()
             if now - last_alert < cooldown_seconds:
                 remaining = int(cooldown_seconds - (now - last_alert))
-                print(f"[distraction_loop] Distracted by {app_name}, but in {cooldown_seconds}s cooldown ({remaining}s left).")
+                _log(f"Decision: Distraction detected but suppressed. Cooldown is active for '{app_name}' on task '{task['title']}' ({remaining}s remaining of {cooldown_seconds}s limit).", "INFO")
                 continue
                 
             # ── 9. Send alert to backend ──────────────────────────────────
+            _log(f"⚠️ Distraction validated! Preparing alert notification payload for app '{app_name}'...", "WARNING")
             alert_data = {
                 "task_id": task["id"],
                 "task_title": task["title"],
@@ -174,11 +222,10 @@ def _loop():
             
             # ── 10. Update cooldown ───────────────────────────────────────
             _cooldowns[combo_key] = now
-            print(f"[distraction_loop] ✓ ALERT FIRED: {app_name} during '{task['title']}' "
-                  f"(severity={result.get('severity')}, category={result.get('distraction_category')})")
+            _log(f"✓ Alert payload successfully posted to backend. Cooldown reset for '{app_name}'.", "INFO")
             
         except Exception as e:
-            print(f"[distraction_loop] Loop error: {e}")
+            _log(f"Unexpected Loop error: {e}", "ERROR")
 
 
 def start_distraction_loop():
@@ -188,3 +235,4 @@ def start_distraction_loop():
     _running = True
     _distraction_thread = threading.Thread(target=_loop, daemon=True)
     _distraction_thread.start()
+    _log("Distraction detection background service initialized.", "INFO")
